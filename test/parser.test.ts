@@ -82,4 +82,19 @@ describe("parsePath", () => {
     const r = parsePath("/align-left/Hi.svg")!;
     expect(r.options.align).toBe("left");
   });
+
+  it("font-serif はショートカットで展開される", () => {
+    const r = parsePath("/font-serif/Hi.svg")!;
+    expect(r.options.fontFamily).toMatch(/Mincho|serif/);
+  });
+
+  it("font-mono はショートカットで展開される", () => {
+    const r = parsePath("/font-mono/Hi.svg")!;
+    expect(r.options.fontFamily).toMatch(/monospace/);
+  });
+
+  it("未知のフォント名はそのまま使われる", () => {
+    const r = parsePath("/font-Impact/Hi.svg")!;
+    expect(r.options.fontFamily).toBe("Impact");
+  });
 });

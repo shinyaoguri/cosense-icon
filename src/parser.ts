@@ -60,11 +60,25 @@ const KEY_ALIASES: Record<string, keyof IconOptions> = {
   "text-align": "align",
 };
 
+const FONT_STACKS: Record<string, string> = {
+  sans: "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif",
+  serif: "'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', 'Times New Roman', serif",
+  mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  rounded: "'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'M PLUS Rounded 1c', sans-serif",
+  gothic: "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif",
+  mincho: "'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', 'Times New Roman', serif",
+};
+
+export function expandFontFamily(v: string): string {
+  const key = v.trim().toLowerCase();
+  return FONT_STACKS[key] ?? v;
+}
+
 const DEFAULTS: IconOptions = {
   bg: "#ffffff",
   fg: "#222222",
-  width: 300,
-  height: 300,
+  width: 600,
+  height: 400,
   fontFamily:
     "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif",
   fontWeight: "700",
@@ -139,7 +153,7 @@ function applyOption(opts: IconOptions, rawKey: string, rawValue: string): void 
       return;
     }
     case "fontFamily": {
-      opts.fontFamily = rawValue;
+      opts.fontFamily = expandFontFamily(rawValue);
       return;
     }
     case "fontWeight": {

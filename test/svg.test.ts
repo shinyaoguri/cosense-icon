@@ -8,7 +8,8 @@ describe("renderSvg", () => {
     const svg = renderSvg(parsed.text, parsed.options);
     expect(svg).toContain("<svg");
     expect(svg).toContain("Hello");
-    expect(svg).toContain('width="300"');
+    expect(svg).toContain('width="600"');
+    expect(svg).toContain('height="400"');
   });
 
   it("XSS対策: <script> がエスケープされる", () => {
