@@ -1,0 +1,13 @@
+name = "cosense-icon"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# icon.soui.dev を Cloudflare に登録してから有効化する。
+# Cloudflare ダッシュボードで soui.dev ゾーンが存在している必要あり。
+[[routes]]
+pattern = "icon.soui.dev/*"
+zone_name = "soui.dev"
+
+[observability]
+enabled = true
