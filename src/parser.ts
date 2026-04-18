@@ -11,6 +11,7 @@ export type IconOptions = {
   lineHeight: number;
   letterSpacing?: number;
   align: "left" | "center" | "right";
+  timezone?: string;
 };
 
 export type ParsedPath = {
@@ -58,6 +59,9 @@ const KEY_ALIASES: Record<string, keyof IconOptions> = {
   spacing: "letterSpacing",
   align: "align",
   "text-align": "align",
+  tz: "timezone",
+  timezone: "timezone",
+  "タイムゾーン": "timezone",
 };
 
 const FONT_STACKS: Record<string, string> = {
@@ -73,6 +77,27 @@ export function expandFontFamily(v: string): string {
   const key = v.trim().toLowerCase();
   return FONT_STACKS[key] ?? v;
 }
+
+const TZ_SHORTCUTS: Record<string, string> = {
+  jst: "Asia/Tokyo",
+  utc: "UTC",
+  est: "America/New_York",
+  edt: "America/New_York",
+  et: "America/New_York",
+  pst: "America/Los_Angeles",
+  pdt: "America/Los_Angeles",
+  pt: "America/Los_Angeles",
+  cst: "America/Chicago",
+  ct: "America/Chicago",
+  mst: "America/Denver",
+  mt: "America/Denver",
+  cet: "Europe/Paris",
+  cest: "Europe/Paris",
+  gmt: "Europe/London",
+  bst: "Europe/London",
+  ist: "Asia/Kolkata",
+  kst: "Asia/Seoul",
+};
 
 const DEFAULTS: IconOptions = {
   bg: "#ffffff",
@@ -158,6 +183,12 @@ function applyOption(opts: IconOptions, rawKey: string, rawValue: string): void 
     }
     case "fontWeight": {
       opts.fontWeight = rawValue;
+      return;
+    }
+    case "timezone": {
+      const v = rawValue.trim();
+      if (!v) return;
+      opts.timezone = TZ_SHORTCUTS[v.toLowerCase()] ?? v;
       return;
     }
     case "align": {

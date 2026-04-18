@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dynamicText, isDynamicKeyword } from "../src/dynamic";
+import { dynamicText, isDynamicKeyword, resolveTimezone } from "../src/dynamic";
 
 describe("isDynamicKeyword", () => {
   it("today/week/month/year を検出", () => {
@@ -58,5 +58,33 @@ describe("dynamicText", () => {
     expect(dynamicText("today", crossNoon)[1]).toBe("04/19");
     const crossMidnight = new Date("2026-04-19T15:30:00Z"); // JST 2026-04-20 00:30
     expect(dynamicText("today", crossMidnight)[1]).toBe("04/20");
+  });
+
+  it("tz 指定で別のタイムゾーンの日付になる", () => {
+    // UTC 15:30 → JST 翌日 00:30 / NY 11:30 / Honolulu 05:30
+    const t = new Date("2026-04-19T15:30:00Z");
+    expect(dynamicText("today", t, "Asia/Tokyo")[1]).toBe("04/20");
+    expect(dynamicText("today", t, "America/New_York")[1]).toBe("04/19");
+    expect(dynamicText("today", t, "Pacific/Honolulu")[1]).toBe("04/19");
+  });
+});
+
+describe("resolveTimezone", () => {
+  it("明示指定が最優先", () => {
+    expect(resolveTimezone("America/New_York", "Asia/Tokyo")).toBe(
+      "America/New_York",
+    );
+  });
+  it("明示なしなら自動判定を採用", () => {
+    expect(resolveTimezone(undefined, "Europe/Berlin")).toBe("Europe/Berlin");
+  });
+  it("両方なしならデフォルト Asia/Tokyo", () => {
+    expect(resolveTimezone(undefined, undefined)).toBe("Asia/Tokyo");
+  });
+  it("不正な明示指定は無視して自動にフォールバック", () => {
+    expect(resolveTimezone("Not/Real", "Europe/Berlin")).toBe("Europe/Berlin");
+  });
+  it("両方不正ならデフォルト", () => {
+    expect(resolveTimezone("Not/Real", "Also/Bad")).toBe("Asia/Tokyo");
   });
 });

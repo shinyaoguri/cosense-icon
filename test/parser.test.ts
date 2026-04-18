@@ -97,4 +97,19 @@ describe("parsePath", () => {
     const r = parsePath("/font-Impact/Hi.svg")!;
     expect(r.options.fontFamily).toBe("Impact");
   });
+
+  it("tz オプションは%2Fエンコードで /を表現", () => {
+    const r = parsePath("/tz-Asia%2FTokyo/today.svg")!;
+    expect(r.options.timezone).toBe("Asia/Tokyo");
+  });
+
+  it("tz ショートカット jst → Asia/Tokyo", () => {
+    const r = parsePath("/tz-jst/today.svg")!;
+    expect(r.options.timezone).toBe("Asia/Tokyo");
+  });
+
+  it("tz ショートカット et → America/New_York", () => {
+    const r = parsePath("/tz-et/today.svg")!;
+    expect(r.options.timezone).toBe("America/New_York");
+  });
 });

@@ -9,7 +9,7 @@ const DYNAMIC_KEYWORDS = new Set([
   "今年",
 ]);
 
-const TZ = "Asia/Tokyo";
+export const DEFAULT_TZ = "Asia/Tokyo";
 
 export function isDynamicKeyword(text: string[]): string | null {
   if (text.length !== 1) return null;
@@ -17,9 +17,12 @@ export function isDynamicKeyword(text: string[]): string | null {
   return DYNAMIC_KEYWORDS.has(t) ? t : null;
 }
 
-function jstParts(date: Date): { year: string; month: string; day: string } {
+function tzParts(
+  date: Date,
+  tz: string,
+): { year: string; month: string; day: string } {
   const fmt = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ,
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -29,15 +32,15 @@ function jstParts(date: Date): { year: string; month: string; day: string } {
   return { year: get("year"), month: get("month"), day: get("day") };
 }
 
-function jstWeekdayJa(date: Date): string {
+function tzWeekdayJa(date: Date, tz: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
-    timeZone: TZ,
+    timeZone: tz,
     weekday: "short",
   }).format(date);
 }
 
-function isoWeekNumber(date: Date): number {
-  const { year, month, day } = jstParts(date);
+function isoWeekNumber(date: Date, tz: string): number {
+  const { year, month, day } = tzParts(date, tz);
   const d = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
   const dayNr = (d.getUTCDay() + 6) % 7;
   d.setUTCDate(d.getUTCDate() - dayNr + 3);
@@ -48,25 +51,47 @@ function isoWeekNumber(date: Date): number {
   return 1 + Math.round((d.getTime() - firstThursday.getTime()) / weekMs);
 }
 
-export function dynamicText(keyword: string, now: Date): string[] {
+function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveTimezone(
+  explicit: string | undefined,
+  autoDetected: string | undefined,
+): string {
+  if (explicit && isValidTimezone(explicit)) return explicit;
+  if (autoDetected && isValidTimezone(autoDetected)) return autoDetected;
+  return DEFAULT_TZ;
+}
+
+export function dynamicText(
+  keyword: string,
+  now: Date,
+  tz: string = DEFAULT_TZ,
+): string[] {
   switch (keyword) {
     case "today":
     case "今日": {
-      const { year, month, day } = jstParts(now);
-      return [year, `${month}/${day}`, `(${jstWeekdayJa(now)})`];
+      const { year, month, day } = tzParts(now, tz);
+      return [year, `${month}/${day}`, `(${tzWeekdayJa(now, tz)})`];
     }
     case "year":
     case "今年":
-      return [jstParts(now).year];
+      return [tzParts(now, tz).year];
     case "month":
     case "今月": {
-      const { year, month } = jstParts(now);
+      const { year, month } = tzParts(now, tz);
       return [`${year}/${month}`];
     }
     case "week":
     case "今週": {
-      const { year } = jstParts(now);
-      return [year, `W${isoWeekNumber(now)}`];
+      const { year } = tzParts(now, tz);
+      return [year, `W${isoWeekNumber(now, tz)}`];
     }
     default:
       return [keyword];

@@ -38,6 +38,7 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 | `lh` | `line-height` | `1.2` | 行高倍率 |
 | `ls` | `letter-spacing` | `0` | 字間 |
 | `align` | `text-align` | `center` | `left` / `center` / `right` |
+| `tz` | `timezone`, `タイムゾーン` | 自動判定 | 動的キーワードの基準TZ |
 
 色は `#` 付き/なしの 3/4/6/8 桁 hex、CSS 色名、`rgb()` / `hsl()` に対応。
 
@@ -65,7 +66,19 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 
 通常のオプションと組み合わせられる: `/bg-1e40af/fg-fff/today.svg`
 
-タイムゾーンは Asia/Tokyo 固定。週番号は ISO 8601 準拠。
+週番号は ISO 8601 準拠（月曜始まり、1月4日を含む週が第1週）。
+
+### タイムゾーン
+
+優先度は **明示指定 > 自動判定 > `Asia/Tokyo` デフォルト**。
+
+- **明示指定**: `/tz-<tz>/today.svg`。`/` は `%2F` でエンコード（例: `/tz-Asia%2FTokyo/today.svg`）、またはショートカットを使う
+- **自動判定**: Cloudflare がアクセス元IPから推定したタイムゾーン（`request.cf.timezone`）
+- **デフォルト**: `Asia/Tokyo`
+
+ショートカット: `jst` / `utc` / `et`(`est`/`edt`) / `pt`(`pst`/`pdt`) / `ct` / `mt` / `cet` / `gmt` / `bst` / `ist` / `kst`
+
+例: `/tz-et/today.svg`, `/tz-utc/month.svg`
 
 ## キャッシュ戦略
 
