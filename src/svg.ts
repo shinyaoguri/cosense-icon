@@ -1,6 +1,6 @@
 import type { IconOptions } from "./parser";
 
-function escapeXml(s: string): string {
+export function escapeXml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

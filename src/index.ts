@@ -1,4 +1,8 @@
-import { dynamicText, isDynamicKeyword, resolveTimezone } from "./dynamic";
+import {
+  isDynamicKeyword,
+  renderDynamicSvg,
+  resolveTimezone,
+} from "./dynamic";
 import editorHtml from "./editor.html";
 import { parsePath } from "./parser";
 import { renderSvg } from "./svg";
@@ -45,8 +49,7 @@ export default {
       const cfTz = (request as unknown as { cf?: { timezone?: string } }).cf
         ?.timezone;
       const tz = resolveTimezone(parsed.options.timezone, cfTz);
-      const lines = dynamicText(dynamic, new Date(), tz);
-      const svg = renderSvg(lines, parsed.options);
+      const svg = renderDynamicSvg(dynamic, new Date(), tz, parsed.options);
       return new Response(svg, {
         headers: {
           "content-type": "image/svg+xml; charset=utf-8",
