@@ -206,6 +206,13 @@ input[type=range]::-moz-range-thumb {
 .preset-btn:hover { border-color: #38bdf8; color: #38bdf8; }
 .preset-btn.reset-btn { color: #94a3b8; }
 .preset-btn.reset-btn:hover { border-color: #f87171; color: #f87171; }
+.preset-btn.random-btn { color: #a78bfa; border-color: #4c1d95; }
+.preset-btn.random-btn:hover { border-color: #a78bfa; background: #1e1b4b; }
+.row-head { display: flex; justify-content: space-between; align-items: center; margin: 0 0 .75rem; }
+.contrast-label { font-size: .72rem; color: #64748b; margin: -.25rem 0 .75rem; padding-left: .2rem; }
+.contrast-label.ok { color: #4ade80; }
+.contrast-label.warn { color: #fbbf24; }
+.contrast-label.ng { color: #f87171; }
 .custom-font { margin-top: .25rem; display: none; }
 .custom-font.show { display: flex; }
 footer {
@@ -234,9 +241,13 @@ footer a { color: #94a3b8; }
       <textarea id="text" placeholder="改行可(Enter)">B4ゼミ</textarea>
     </div>
 
-    <h2>配色</h2>
+    <div class="row-head">
+      <h2 style="margin:0;">配色</h2>
+      <button type="button" id="random" class="preset-btn random-btn">↻ ランダム</button>
+    </div>
     <div class="field"><label>背景</label><input type="color" id="bg" value="#1e40af"><input type="text" id="bgHex" value="#1e40af"></div>
     <div class="field"><label>文字</label><input type="color" id="fg" value="#ffffff"><input type="text" id="fgHex" value="#ffffff"></div>
+    <div class="contrast-label" id="contrastLabel"></div>
 
     <h2>サイズ</h2>
     <div class="field"><label>幅</label>
@@ -337,6 +348,102 @@ footer a { color: #94a3b8; }
     font: 'sans', fontCustom: '',
   };
 
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+
+  function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    s = clamp01(s); l = clamp01(l);
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if      (h <  60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else              { r = c; b = x; }
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+
+  const toHex = rgb => '#' + rgb.map(x => x.toString(16).padStart(2, '0')).join('');
+
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h.slice(0, 6);
+    return [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16));
+  }
+
+  function relativeLuminance([r, g, b]) {
+    const f = c => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  }
+
+  function contrastRatio(rgb1, rgb2) {
+    const l1 = relativeLuminance(rgb1);
+    const l2 = relativeLuminance(rgb2);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }
+
+  function randomPalette() {
+    // 背景をHSLで候補生成、文字色は明暗対比 + 軽い色相ずらしで作り、コントラスト4.5以上になるまで試行
+    for (let i = 0; i < 80; i++) {
+      const bgH = rand(0, 360);
+      const bgS = rand(0.35, 0.9);
+      const bgL = rand(0.12, 0.92);
+      const bgRgb = hslToRgb(bgH, bgS, bgL);
+
+      const dark = bgL >= 0.5;
+      const fgH = (bgH + rand(-40, 40) + 360) % 360;
+      const fgS = rand(0.05, dark ? 0.6 : 0.55);
+      const fgL = dark ? rand(0.04, 0.2) : rand(0.88, 1.0);
+      const fgRgb = hslToRgb(fgH, fgS, fgL);
+
+      if (contrastRatio(bgRgb, fgRgb) >= 4.5) {
+        return { bg: toHex(bgRgb), fg: toHex(fgRgb) };
+      }
+    }
+    // フォールバック: 背景を少し薄くして白黒で対比
+    const bgH = rand(0, 360);
+    const bgS = rand(0.45, 0.85);
+    const bgL = rand(0.2, 0.8);
+    const bgRgb = hslToRgb(bgH, bgS, bgL);
+    const fg = relativeLuminance(bgRgb) > 0.4 ? '#151515' : '#fafafa';
+    return { bg: toHex(bgRgb), fg };
+  }
+
+  function updateContrast() {
+    const bg = hexToRgb($('bg').value);
+    const fg = hexToRgb($('fg').value);
+    const r = contrastRatio(bg, fg);
+    const el = $('contrastLabel');
+    const rounded = r.toFixed(2);
+    el.classList.remove('ok', 'warn', 'ng');
+    if (r >= 7) {
+      el.textContent = 'コントラスト比 ' + rounded + ' : 1 (AAA)';
+      el.classList.add('ok');
+    } else if (r >= 4.5) {
+      el.textContent = 'コントラスト比 ' + rounded + ' : 1 (AA)';
+      el.classList.add('ok');
+    } else if (r >= 3) {
+      el.textContent = 'コントラスト比 ' + rounded + ' : 1 (大きな文字のみ可)';
+      el.classList.add('warn');
+    } else {
+      el.textContent = 'コントラスト比 ' + rounded + ' : 1 (読みにくい)';
+      el.classList.add('ng');
+    }
+  }
+
+  function applyColors(bg, fg) {
+    $('bg').value = bg; $('bgHex').value = bg;
+    $('fg').value = fg; $('fgHex').value = fg;
+    update();
+  }
+
   function reset() {
     $('text').value = initial.text;
     $('bg').value = initial.bg; $('bgHex').value = initial.bg;
@@ -411,6 +518,10 @@ footer a { color: #94a3b8; }
   }
 
   $('reset').addEventListener('click', reset);
+  $('random').addEventListener('click', () => {
+    const p = randomPalette();
+    applyColors(p.bg, p.fg);
+  });
 
   (function renderPresets() {
     const wrap = $('presets');
@@ -467,6 +578,7 @@ footer a { color: #94a3b8; }
     $('url').value = full;
     $('cosense').value = '[' + full + ']';
     $('markdown').value = '![icon](' + full + ')';
+    updateContrast();
   }
 
   document.querySelectorAll('input, select, textarea').forEach(el =>
