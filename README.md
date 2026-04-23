@@ -53,6 +53,20 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 | `rounded` | 丸ゴシック系 (Hiragino Maru Gothic ProN 等) |
 | `mono` | 等幅 (ui-monospace, SFMono-Regular 等) |
 
+## ランダム配色
+
+パスに `/random/` セグメントを含めると、**テキストから決定的に生成したランダム配色**（WCAG AA 4.5:1 準拠）で bg/fg が埋まる。
+
+```
+/random/hoge.svg
+/random/radius-24/size-72/hoge.svg   # 他オプションと併用可
+/bg-red/random/hoge.svg              # 明示指定した bg/fg は尊重される（この例では背景赤のまま、文字色だけランダム）
+```
+
+- 同じテキストなら常に同じ色になる（ハッシュベース）。よって初見では毎回「違う色」に見え、同じ URL を再訪すれば必ず同じ色に戻る
+- 位置は任意（先頭でも途中でも可）、大文字小文字を区別しない
+- 明示された `bg` / `fg` はランダムで上書きされない
+
 ## 動的キーワード（常に最新）
 
 以下のパスは**アクセス時点**の情報に書き換わる。キャッシュされない（`no-store`）。

@@ -17,6 +17,8 @@ export type IconOptions = {
 export type ParsedPath = {
   text: string[];
   options: IconOptions;
+  random: boolean;
+  explicit: Set<keyof IconOptions>;
 };
 
 const KEY_ALIASES: Record<string, keyof IconOptions> = {
@@ -148,14 +150,22 @@ function parseAlign(v: string): IconOptions["align"] | null {
   return null;
 }
 
-function applyOption(opts: IconOptions, rawKey: string, rawValue: string): void {
+function applyOption(
+  opts: IconOptions,
+  explicit: Set<keyof IconOptions>,
+  rawKey: string,
+  rawValue: string,
+): void {
   const key = KEY_ALIASES[rawKey.toLowerCase()];
   if (!key) return;
   switch (key) {
     case "bg":
     case "fg": {
       const c = parseColor(rawValue);
-      if (c) opts[key] = c;
+      if (c) {
+        opts[key] = c;
+        explicit.add(key);
+      }
       return;
     }
     case "width":
@@ -163,37 +173,52 @@ function applyOption(opts: IconOptions, rawKey: string, rawValue: string): void 
     case "padding":
     case "radius": {
       const n = parseNumber(rawValue);
-      if (n !== null) opts[key] = n;
+      if (n !== null) {
+        opts[key] = n;
+        explicit.add(key);
+      }
       return;
     }
     case "fontSize":
     case "letterSpacing": {
       const n = parseNumber(rawValue);
-      if (n !== null) opts[key] = n;
+      if (n !== null) {
+        opts[key] = n;
+        explicit.add(key);
+      }
       return;
     }
     case "lineHeight": {
       const n = Number(rawValue);
-      if (Number.isFinite(n) && n > 0) opts.lineHeight = n;
+      if (Number.isFinite(n) && n > 0) {
+        opts.lineHeight = n;
+        explicit.add("lineHeight");
+      }
       return;
     }
     case "fontFamily": {
       opts.fontFamily = expandFontFamily(rawValue);
+      explicit.add("fontFamily");
       return;
     }
     case "fontWeight": {
       opts.fontWeight = rawValue;
+      explicit.add("fontWeight");
       return;
     }
     case "timezone": {
       const v = rawValue.trim();
       if (!v) return;
       opts.timezone = TZ_SHORTCUTS[v.toLowerCase()] ?? v;
+      explicit.add("timezone");
       return;
     }
     case "align": {
       const a = parseAlign(rawValue);
-      if (a) opts.align = a;
+      if (a) {
+        opts.align = a;
+        explicit.add("align");
+      }
       return;
     }
   }
@@ -225,16 +250,22 @@ export function parsePath(pathname: string): ParsedPath | null {
 
   const optionSegments = segments.slice(0, -1);
   const opts: IconOptions = { ...DEFAULTS };
+  const explicit = new Set<keyof IconOptions>();
+  let random = false;
 
   for (const seg of optionSegments) {
+    if (seg.toLowerCase() === "random") {
+      random = true;
+      continue;
+    }
     for (const token of seg.split(",")) {
       const pair = splitFirst(token, KV_SEPARATORS);
       if (!pair) continue;
       const [k, v] = pair;
       if (!k || v === undefined) continue;
-      applyOption(opts, k, v);
+      applyOption(opts, explicit, k, v);
     }
   }
 
-  return { text: parseText(textRaw), options: opts };
+  return { text: parseText(textRaw), options: opts, random, explicit };
 }

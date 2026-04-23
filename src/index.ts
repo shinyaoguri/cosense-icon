@@ -5,6 +5,7 @@ import {
 } from "./dynamic";
 import editorHtml from "./editor.html";
 import { parsePath } from "./parser";
+import { deterministicPalette } from "./random";
 import { renderSvg } from "./svg";
 
 const NO_STORE_HEADERS = {
@@ -62,6 +63,12 @@ export default {
     const cacheKey = new Request(url.toString(), { method: "GET" });
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
+
+    if (parsed.random) {
+      const palette = deterministicPalette(parsed.text.join("\n"));
+      if (!parsed.explicit.has("bg")) parsed.options.bg = palette.bg;
+      if (!parsed.explicit.has("fg")) parsed.options.fg = palette.fg;
+    }
 
     const svg = renderSvg(parsed.text, parsed.options);
 
