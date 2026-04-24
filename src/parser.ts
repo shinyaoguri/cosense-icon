@@ -19,6 +19,7 @@ export type ParsedPath = {
   options: IconOptions;
   random: boolean;
   explicit: Set<keyof IconOptions>;
+  rawFontValue?: string;
 };
 
 const KEY_ALIASES: Record<string, keyof IconOptions> = {
@@ -78,6 +79,11 @@ const FONT_STACKS: Record<string, string> = {
 export function expandFontFamily(v: string): string {
   const key = v.trim().toLowerCase();
   return FONT_STACKS[key] ?? v;
+}
+
+export function isGoogleFontCandidate(raw: string | undefined): boolean {
+  if (!raw) return false;
+  return !(raw.trim().toLowerCase() in FONT_STACKS);
 }
 
 const TZ_SHORTCUTS: Record<string, string> = {
@@ -153,6 +159,7 @@ function parseAlign(v: string): IconOptions["align"] | null {
 function applyOption(
   opts: IconOptions,
   explicit: Set<keyof IconOptions>,
+  state: { rawFontValue?: string },
   rawKey: string,
   rawValue: string,
 ): void {
@@ -199,6 +206,7 @@ function applyOption(
     case "fontFamily": {
       opts.fontFamily = expandFontFamily(rawValue);
       explicit.add("fontFamily");
+      state.rawFontValue = rawValue.trim();
       return;
     }
     case "fontWeight": {
@@ -251,6 +259,7 @@ export function parsePath(pathname: string): ParsedPath | null {
   const optionSegments = segments.slice(0, -1);
   const opts: IconOptions = { ...DEFAULTS };
   const explicit = new Set<keyof IconOptions>();
+  const state: { rawFontValue?: string } = {};
   let random = false;
 
   for (const seg of optionSegments) {
@@ -263,9 +272,15 @@ export function parsePath(pathname: string): ParsedPath | null {
       if (!pair) continue;
       const [k, v] = pair;
       if (!k || v === undefined) continue;
-      applyOption(opts, explicit, k, v);
+      applyOption(opts, explicit, state, k, v);
     }
   }
 
-  return { text: parseText(textRaw), options: opts, random, explicit };
+  return {
+    text: parseText(textRaw),
+    options: opts,
+    random,
+    explicit,
+    rawFontValue: state.rawFontValue,
+  };
 }

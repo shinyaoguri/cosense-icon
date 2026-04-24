@@ -4,6 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cosense-icon editor</title>
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/wawoff2@2.0.1/build/decompress_binding.js" defer></script>
+<script>
+  window.onTurnstileToken = function (token) {
+    window._turnstileToken = token;
+    if (window._turnstileTokenResolve) {
+      const r = window._turnstileTokenResolve;
+      window._turnstileTokenResolve = null;
+      r(token);
+    }
+  };
+  window.onTurnstileError = function () {
+    window._turnstileToken = null;
+  };
+  window.onTurnstileExpired = function () {
+    window._turnstileToken = null;
+  };
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer onerror="console.error('Turnstile script load failed')"></script>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -264,18 +283,13 @@ footer a { color: #94a3b8; }
 
     <h2>文字</h2>
     <div class="field"><label>フォント</label>
-      <select id="font">
-        <option value="sans">ゴシック (sans)</option>
-        <option value="serif">明朝 (serif)</option>
-        <option value="rounded">丸ゴシック (rounded)</option>
-        <option value="mono">等幅 (mono)</option>
-        <option value="custom">カスタム...</option>
-      </select>
+      <select id="font"></select>
     </div>
     <div class="field custom-font" id="customFontWrap">
       <label></label>
       <input type="text" id="fontCustom" placeholder="例: Impact / 'Comic Sans MS' / Futura">
     </div>
+    <p class="help" id="googleFontHelp" style="display:none;">Google Fonts を選択中。右下の「Path化して共有」で URL を有効化する。</p>
     <div class="field"><label>字サイズ</label>
       <input type="checkbox" id="sizeAuto" checked>
       <span style="color:#94a3b8;font-size:.75rem;flex:none;">自動</span>
@@ -326,16 +340,488 @@ footer a { color: #94a3b8; }
         <button type="button" data-copy="markdown">コピー</button>
       </div>
     </div>
+
+    <div class="panel url-box" id="pathifyPanel" style="display:none;">
+      <h2>Path化して共有 (Google Fonts)</h2>
+      <p class="help">Google Fonts は閲覧者の端末に依存しないよう、Path化して R2 に登録する。</p>
+      <div class="url-row">
+        <button type="button" id="pathifyBtn">Path化して共有</button>
+      </div>
+      <div id="turnstile" class="cf-turnstile" data-callback="onTurnstileToken" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin-top:.5rem;"></div>
+      <p class="help" id="pathifyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
+    </div>
   </div>
 </main>
 <footer>
   source: <a href="https://github.com/shinyaoguri/cosense-icon" target="_blank" rel="noopener">shinyaoguri/cosense-icon</a>
+  ・ fonts: <a href="https://fonts.google.com/" target="_blank" rel="noopener">Google Fonts</a> (OFL / Apache 2.0)
 </footer>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const defaults = { bg: '#ffffff', fg: '#222222', w: 600, h: 400, weight: '700', padding: 24, radius: 0, align: 'center', lh: 1.2, ls: 0, font: 'sans' };
+
+  const TURNSTILE_SITE_KEY_PROD = '0x4AAAAAADCcoss7Lly4m3Td';
+  const TURNSTILE_SITE_KEY_DEV = '1x00000000000000000000AA';
+  const IS_LOCAL_DEV = ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname);
+  const TURNSTILE_SITE_KEY = IS_LOCAL_DEV ? TURNSTILE_SITE_KEY_DEV : TURNSTILE_SITE_KEY_PROD;
+
+  (function setupTurnstileWidget() {
+    const el = document.getElementById('turnstile');
+    if (el && !el.getAttribute('data-sitekey')) {
+      el.setAttribute('data-sitekey', TURNSTILE_SITE_KEY);
+    }
+  })();
+
+  const BUILTIN_FONTS = ['sans', 'serif', 'rounded', 'mono', 'custom'];
+  const BUILTIN_LABELS = {
+    sans: 'ゴシック (sans)',
+    serif: '明朝 (serif)',
+    rounded: '丸ゴシック (rounded)',
+    mono: '等幅 (mono)',
+    custom: 'カスタム...',
+  };
+
+  const GOOGLE_FONTS = [
+    ['日本語 Sans',    ['Noto Sans JP', 'M PLUS 1p', 'M PLUS 2', 'M PLUS Rounded 1c', 'Kosugi', 'Kosugi Maru', 'Sawarabi Gothic', 'Zen Kaku Gothic New', 'Zen Kaku Gothic Antique', 'Zen Maru Gothic', 'BIZ UDPGothic', 'BIZ UDGothic']],
+    ['日本語 Serif',   ['Noto Serif JP', 'Sawarabi Mincho', 'Shippori Mincho', 'Shippori Mincho B1', 'Shippori Antique', 'Shippori Antique B1', 'Kaisei Decol', 'Kaisei HarunoUmi', 'Kaisei Opti', 'Kaisei Tokumin', 'Klee One', 'Hina Mincho', 'Zen Old Mincho', 'Zen Antique', 'Zen Antique Soft', 'BIZ UDPMincho', 'BIZ UDMincho', 'New Tegomin']],
+    ['日本語 Display', ['Dela Gothic One', 'DotGothic16', 'Hachi Maru Pop', 'Mochiy Pop One', 'Mochiy Pop P One', 'Potta One', 'Rampart One', 'Reggae One', 'RocknRoll One', 'Stick', 'Train One', 'Yomogi', 'Yuji Boku', 'Yuji Mai', 'Yuji Syuku', 'Yusei Magic']],
+    ['ラテン Sans',    ['Roboto', 'Open Sans', 'Noto Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Nunito', 'Nunito Sans', 'Inter', 'DM Sans', 'Public Sans', 'Work Sans', 'Ubuntu', 'Rubik', 'Karla', 'Mulish', 'IBM Plex Sans', 'Barlow', 'Manrope', 'Be Vietnam Pro', 'Fira Sans', 'Oxygen', 'Quicksand', 'Comfortaa', 'Josefin Sans', 'PT Sans', 'Kanit', 'Source Sans 3', 'Hind', 'Titillium Web', 'Archivo', 'Cabin', 'Exo 2', 'Assistant']],
+    ['ラテン Serif',   ['Merriweather', 'Playfair Display', 'Lora', 'PT Serif', 'Noto Serif', 'Source Serif 4', 'IBM Plex Serif', 'Bitter', 'Cormorant', 'Cormorant Garamond', 'EB Garamond', 'Libre Baskerville', 'Crimson Text', 'Crimson Pro', 'Cardo', 'DM Serif Display', 'DM Serif Text', 'Roboto Serif', 'Noticia Text', 'Arvo', 'Alegreya', 'Vollkorn', 'Spectral', 'Cormorant Infant', 'Young Serif']],
+    ['Mono',           ['Roboto Mono', 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'IBM Plex Mono', 'Space Mono', 'Inconsolata', 'Cousine', 'Ubuntu Mono', 'Noto Sans Mono', 'PT Mono', 'Anonymous Pro', 'DM Mono']],
+    ['Display',        ['Bebas Neue', 'Oswald', 'Anton', 'Archivo Black', 'Black Ops One', 'Bungee', 'Russo One', 'Alfa Slab One', 'Abril Fatface', 'Fjalla One', 'Staatliches', 'Righteous', 'Lobster', 'Chakra Petch', 'Orbitron', 'Press Start 2P', 'Major Mono Display']],
+    ['Handwriting',    ['Dancing Script', 'Pacifico', 'Caveat', 'Indie Flower', 'Shadows Into Light', 'Great Vibes', 'Sacramento', 'Satisfy', 'Kalam', 'Amatic SC', 'Parisienne', 'Cookie', 'Allura', 'Courgette', 'Kaushan Script', 'Permanent Marker', 'Homemade Apple']],
+  ];
+
+  const GOOGLE_FONT_SET = new Set(GOOGLE_FONTS.flatMap(([, fonts]) => fonts));
+
+  function isGoogleFont(v) { return GOOGLE_FONT_SET.has(v); }
+  function isBuiltinFont(v) { return BUILTIN_FONTS.includes(v); }
+
+  (function populateFontSelect() {
+    const sel = $('font');
+    sel.innerHTML = '';
+    const builtinGroup = document.createElement('optgroup');
+    builtinGroup.label = '組み込み';
+    BUILTIN_FONTS.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = BUILTIN_LABELS[v];
+      builtinGroup.appendChild(opt);
+    });
+    sel.appendChild(builtinGroup);
+    GOOGLE_FONTS.forEach(([cat, fonts]) => {
+      const og = document.createElement('optgroup');
+      og.label = 'Google Fonts – ' + cat;
+      fonts.forEach(family => {
+        const opt = document.createElement('option');
+        opt.value = family;
+        opt.textContent = family;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+  })();
+
+  function currentFontValue() {
+    const v = $('font').value;
+    if (v === 'custom') return $('fontCustom').value.trim();
+    return v;
+  }
+
+  function updateFontMode() {
+    const useGF = isGoogleFont(currentFontValue());
+    $('googleFontHelp').style.display = useGF ? '' : 'none';
+    $('pathifyPanel').style.display = useGF ? '' : 'none';
+  }
+
+  function xmlEscape(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  async function fetchFontCss(family, weight, text) {
+    const p = new URLSearchParams();
+    p.set('family', family);
+    if (weight) p.set('weight', String(weight));
+    if (text) p.set('text', text);
+    const res = await fetch('/api/font-css?' + p.toString());
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error('Google Fonts CSS取得失敗: ' + res.status + ' ' + body.slice(0, 120));
+    }
+    return res.text();
+  }
+
+  function extractFontUrls(css) {
+    const urls = [];
+    const re = /url\(\s*['"]?(https?:\/\/[^)'"\s]+)['"]?\s*\)/gi;
+    let m;
+    while ((m = re.exec(css)) !== null) urls.push(m[1]);
+    return urls;
+  }
+
+  function detectFontFormat(u8) {
+    if (u8.length < 4) return 'unknown';
+    const sig = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
+    if (sig === 'wOF2') return 'woff2';
+    if (sig === 'wOFF') return 'woff';
+    if (sig === 'OTTO') return 'otf';
+    if (sig === 'true' || sig === 'typ1') return 'ttf';
+    if (u8[0] === 0x00 && u8[1] === 0x01 && u8[2] === 0x00 && u8[3] === 0x00) return 'ttf';
+    return 'unknown';
+  }
+
+  async function fetchFontBuffer(family, weight, text) {
+    const css = await fetchFontCss(family, weight, text);
+    const urls = extractFontUrls(css);
+    if (urls.length === 0) {
+      console.error('CSS body:', css.slice(0, 400));
+      throw new Error('font URL not found in CSS: ' + css.slice(0, 120));
+    }
+    const priority = [/\.woff2(\?|$|#)/i, /\.woff(\?|$|#)/i, /\.ttf(\?|$|#)/i, /\.otf(\?|$|#)/i];
+    let fontUrl = null;
+    for (const re of priority) {
+      fontUrl = urls.find(u => re.test(u));
+      if (fontUrl) break;
+    }
+    if (!fontUrl) fontUrl = urls[0];
+
+    const buf = await fetch(fontUrl).then(r => {
+      if (!r.ok) throw new Error('font download failed: ' + r.status);
+      return r.arrayBuffer();
+    });
+    let u8 = new Uint8Array(buf);
+    const fmt = detectFontFormat(u8);
+    if (fmt === 'woff2') {
+      await waitForWawoff2();
+      if (typeof window.Module.decompress !== 'function') {
+        throw new Error('wawoff2 decompress unavailable');
+      }
+      const out = window.Module.decompress(u8);
+      u8 = out instanceof Uint8Array ? out : new Uint8Array(out);
+      const decSig = detectFontFormat(u8);
+      if (decSig === 'woff2' || decSig === 'unknown') {
+        throw new Error('woff2 decompress failed (still ' + decSig + ')');
+      }
+    } else if (fmt === 'woff') {
+      throw new Error('woff (v1) フォーマットは未対応。woff2/ttf を期待。');
+    }
+    return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+  }
+
+  let _wawoff2Ready = null;
+  function waitForWawoff2() {
+    if (_wawoff2Ready) return _wawoff2Ready;
+    _wawoff2Ready = new Promise((resolve, reject) => {
+      let n = 0;
+      const tick = () => {
+        if (window.Module && typeof window.Module.decompress === 'function') {
+          resolve();
+        } else if (++n >= 200) {
+          reject(new Error('wawoff2 初期化タイムアウト'));
+        } else {
+          setTimeout(tick, 50);
+        }
+      };
+      tick();
+    });
+    return _wawoff2Ready;
+  }
+
+  function buildSvgFromFont(font, lines, opts) {
+    const { width, height, padding, bg, fg, radius, align, lh } = opts;
+    const innerW = Math.max(1, width - padding * 2);
+    const innerH = Math.max(1, height - padding * 2);
+
+    let fontSize;
+    if (opts.size) {
+      fontSize = opts.size;
+    } else {
+      const probe = 100;
+      const longest = lines.reduce((max, line) => {
+        const w = font.getAdvanceWidth(line, probe);
+        return Math.max(max, w);
+      }, 0);
+      const maxByWidth = longest > 0 ? (innerW / longest) * probe : innerH;
+      const maxByHeight = innerH / (lines.length * lh);
+      fontSize = Math.max(8, Math.min(maxByWidth, maxByHeight));
+    }
+
+    const totalTextHeight = fontSize * lh * lines.length;
+    const startY = (height - totalTextHeight) / 2 + fontSize * lh * 0.8;
+
+    const pathDatas = lines.map((line, i) => {
+      const y = startY + i * fontSize * lh;
+      const lineWidth = font.getAdvanceWidth(line, fontSize);
+      let x;
+      if (align === 'left') x = padding;
+      else if (align === 'right') x = width - padding - lineWidth;
+      else x = (width - lineWidth) / 2;
+      return font.getPath(line, x, y, fontSize).toPathData(2);
+    });
+
+    const bgShape = radius > 0
+      ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${xmlEscape(bg)}"/>`
+      : `<rect width="${width}" height="${height}" fill="${xmlEscape(bg)}"/>`;
+    const pathEls = pathDatas
+      .map(d => `<path d="${d}" fill="${xmlEscape(fg)}"/>`)
+      .join('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+${bgShape}
+${pathEls}
+</svg>`;
+  }
+
+  function getTurnstileToken() {
+    if (window._turnstileToken) return Promise.resolve(window._turnstileToken);
+    return new Promise((resolve, reject) => {
+      window._turnstileTokenResolve = resolve;
+      setTimeout(() => {
+        if (window._turnstileTokenResolve === resolve) {
+          window._turnstileTokenResolve = null;
+          reject(new Error('Turnstile トークン取得タイムアウト。ページを再読込してもう一度。'));
+        }
+      }, 30000);
+    });
+  }
+
+  function collectIconOpts() {
+    return {
+      width: +$('w').value,
+      height: +$('h').value,
+      padding: +$('padding').value,
+      radius: +$('radius').value,
+      lh: +$('lh').value,
+      bg: $('bg').value,
+      fg: $('fg').value,
+      align: $('align').value,
+      size: $('sizeAuto').checked ? null : +$('size').value,
+    };
+  }
+
+  let _fontCache = new Map();
+  const FONT_CACHE_MAX = 8;
+  let _inflightFont = null;
+  let _inflightFontKey = '';
+
+  async function ensureFont(family, weight, text) {
+    const key = family + '|' + weight + '|' + text;
+    if (_fontCache.has(key)) {
+      const cached = _fontCache.get(key);
+      _fontCache.delete(key);
+      _fontCache.set(key, cached);
+      return cached;
+    }
+    if (_inflightFontKey === key && _inflightFont) return _inflightFont;
+
+    _inflightFontKey = key;
+    _inflightFont = (async () => {
+      const buf = await fetchFontBuffer(family, weight, text);
+      const font = opentype.parse(buf);
+      _fontCache.set(key, font);
+      while (_fontCache.size > FONT_CACHE_MAX) {
+        const first = _fontCache.keys().next().value;
+        _fontCache.delete(first);
+      }
+      return font;
+    })();
+    try {
+      return await _inflightFont;
+    } finally {
+      if (_inflightFontKey === key) {
+        _inflightFontKey = '';
+        _inflightFont = null;
+      }
+    }
+  }
+
+  let _previewObjectUrl = null;
+  let _previewDebounceTimer = null;
+  let _previewReqId = 0;
+  const PREVIEW_DEBOUNCE_MS = 220;
+
+  function revokePreviewUrl() {
+    if (_previewObjectUrl) {
+      URL.revokeObjectURL(_previewObjectUrl);
+      _previewObjectUrl = null;
+    }
+  }
+
+  async function renderPathifyPreview() {
+    const family = currentFontValue();
+    if (!isGoogleFont(family)) return;
+    const text = $('text').value || 'sample';
+    const weight = $('weight').value;
+    const reqId = ++_previewReqId;
+    try {
+      const font = await ensureFont(family, weight, text);
+      if (reqId !== _previewReqId) return;
+      const lines = text.split(/\r?\n/);
+      const svg = buildSvgFromFont(font, lines, collectIconOpts());
+      if (reqId !== _previewReqId) return;
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      revokePreviewUrl();
+      _previewObjectUrl = url;
+      $('preview').src = url;
+    } catch (e) {
+      if (reqId !== _previewReqId) return;
+      console.warn('pathify preview failed', e);
+      revokePreviewUrl();
+      $('preview').src = build();
+    }
+  }
+
+  function schedulePathifyPreview() {
+    clearTimeout(_previewDebounceTimer);
+    _previewDebounceTimer = setTimeout(renderPathifyPreview, PREVIEW_DEBOUNCE_MS);
+  }
+
+  async function pathifyAndRegister() {
+    const status = $('pathifyStatus');
+    const btn = $('pathifyBtn');
+    const family = currentFontValue();
+    if (!isGoogleFont(family)) {
+      status.textContent = 'Google Fonts から選んでください。';
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const text = $('text').value || 'sample';
+      const lines = text.split(/\r?\n/);
+      const weight = $('weight').value;
+
+      status.textContent = 'フォント取得中...';
+      const font = await ensureFont(family, weight, text);
+
+      status.textContent = 'Path 化中...';
+      const svg = buildSvgFromFont(font, lines, collectIconOpts());
+
+      status.textContent = '認証中 (Turnstile)...';
+      const token = await getTurnstileToken();
+      if (!token) {
+        status.textContent = '認証失敗。ページを再読み込みしてもう一度。';
+        return;
+      }
+
+      status.textContent = '登録中...';
+      const pathname = build();
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pathname, svg, turnstileToken: token }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        status.textContent = '登録失敗 (' + res.status + '): ' + body;
+        return;
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+      $('preview').src = pathname + '?_=' + Date.now();
+      status.textContent = '登録完了。URL を共有できます。';
+    } catch (e) {
+      console.error(e);
+      status.textContent = 'エラー: ' + (e && e.message ? e.message : String(e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  const KEY_ALIASES = {
+    bg: 'bg', background: 'bg', 'background-color': 'bg', '背景': 'bg',
+    fg: 'fg', color: 'fg', text: 'fg', foreground: 'fg', '文字色': 'fg',
+    w: 'w', width: 'w', '幅': 'w',
+    h: 'h', height: 'h', '高さ': 'h',
+    size: 'size', fontsize: 'size', 'font-size': 'size', '文字サイズ': 'size',
+    font: 'font', 'font-family': 'font', family: 'font',
+    weight: 'weight', 'font-weight': 'weight', bold: 'weight',
+    padding: 'padding', p: 'padding',
+    radius: 'radius', r: 'radius', rounded: 'radius', 'border-radius': 'radius',
+    lh: 'lh', 'line-height': 'lh', lineheight: 'lh',
+    ls: 'ls', 'letter-spacing': 'ls', spacing: 'ls',
+    align: 'align', 'text-align': 'align',
+  };
+
+  function applySingleOpt(k, v) {
+    switch (k) {
+      case 'bg':
+      case 'fg': {
+        const hex = /^#?[0-9a-fA-F]{3,8}$/.test(v)
+          ? (v.startsWith('#') ? v : '#' + v)
+          : v;
+        $(k).value = hex;
+        $(k + 'Hex').value = hex;
+        return;
+      }
+      case 'w': case 'h': case 'padding': case 'radius': case 'lh': case 'ls': {
+        const n = Number(v);
+        if (!isFinite(n)) return;
+        $(k).value = n;
+        const rng = $(k + 'Range');
+        if (rng) rng.value = n;
+        return;
+      }
+      case 'size': {
+        const n = Number(v);
+        if (!isFinite(n)) return;
+        $('sizeAuto').checked = false;
+        $('size').disabled = false;
+        $('sizeRange').disabled = false;
+        $('size').value = n;
+        $('sizeRange').value = n;
+        return;
+      }
+      case 'weight': $('weight').value = v; return;
+      case 'align': $('align').value = v; return;
+      case 'font': {
+        const low = v.toLowerCase();
+        if (BUILTIN_FONTS.includes(low)) {
+          $('font').value = low;
+          $('customFontWrap').classList.remove('show');
+        } else if (isGoogleFont(v)) {
+          $('font').value = v;
+          $('customFontWrap').classList.remove('show');
+        } else {
+          $('font').value = 'custom';
+          $('fontCustom').value = v;
+          $('customFontWrap').classList.add('show');
+        }
+        return;
+      }
+    }
+  }
+
+  function applyPathname(pathname) {
+    const trimmed = pathname.replace(/^\/+/, '');
+    if (!trimmed) return;
+    const segs = trimmed.split('/').map(s => {
+      try { return decodeURIComponent(s); } catch { return s; }
+    }).filter(s => s.length);
+    if (segs.length === 0) return;
+
+    const last = segs[segs.length - 1];
+    const textRaw = last.replace(/\.svg$/i, '');
+    if (textRaw) $('text').value = textRaw.replace(/\\n/g, '\n');
+
+    segs.slice(0, -1).forEach(seg => {
+      seg.split(',').forEach(tok => {
+        const m = tok.match(/^([^-=:]+)[-=:](.*)$/);
+        if (!m) return;
+        const key = KEY_ALIASES[m[1].toLowerCase()];
+        if (!key) return;
+        applySingleOpt(key, m[2]);
+      });
+    });
+  }
 
   const initial = {
     text: 'B4ゼミ',
@@ -572,12 +1058,21 @@ footer a { color: #94a3b8; }
 
   function update() {
     const path = build();
-    $('preview').src = path;
     const full = location.origin + path;
     $('url').value = full;
     $('cosense').value = '[' + full + ']';
     $('markdown').value = '![icon](' + full + ')';
     updateContrast();
+    updateFontMode();
+
+    if (isGoogleFont(currentFontValue())) {
+      schedulePathifyPreview();
+    } else {
+      clearTimeout(_previewDebounceTimer);
+      _previewReqId++;
+      revokePreviewUrl();
+      $('preview').src = path;
+    }
   }
 
   document.querySelectorAll('input, select, textarea').forEach(el =>
@@ -602,6 +1097,29 @@ footer a { color: #94a3b8; }
       }
     });
   });
+
+  $('pathifyBtn').addEventListener('click', pathifyAndRegister);
+
+  (function handleRegen() {
+    const params = new URLSearchParams(location.search);
+    const regen = params.get('regen');
+    if (!regen) return;
+    try {
+      const b64 = regen.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+      const bin = atob(padded);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const pathname = new TextDecoder().decode(bytes);
+      applyPathname(pathname);
+      update();
+      setTimeout(() => {
+        if (isGoogleFont(currentFontValue())) pathifyAndRegister();
+      }, 800);
+    } catch (e) {
+      console.error('regen decode failed', e);
+    }
+  })();
 
   update();
 })();

@@ -94,9 +94,24 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 
 例: `/tz-et/today.svg`, `/tz-utc/month.svg`
 
+## Google Fonts 対応
+
+`font` にビジュアルエディタの Google Fonts リストから選んだファミリ名を指定すると、**エディタでブラウザ側 Path 化した SVG** が R2 に登録され、URL 経由でどこからでも同じ見た目で配信される。
+
+- エディタで対象フォントを選び「Path 化して共有」を押す → Turnstile 認証 → R2 登録
+- 以降、同じ URL は R2 から配信される（Cache API でエッジキャッシュも作る）
+- R2 miss 時は **現行の `<text>` フォールバック**で描画、右下に小さな警告マーカーを付与（短 TTL）。誰かがエディタを再度開けば再登録できる
+- 対応ファミリは [src/editor.html](src/editor.html) 内の `GOOGLE_FONTS` 定数で管理。未掲載のフォントを足したい場合はそこに追記する
+
+動的キーワード (`today`/`week`/`month`/`year`) は対象外（従来通り `<text>` 出力）。
+
+フォントは [Google Fonts](https://fonts.google.com/) から CSS2 API 経由で取得し、ブラウザ上で [opentype.js](https://github.com/opentypejs/opentype.js) と [wawoff2](https://github.com/fontello/wawoff2) を使って Path に変換する。ライセンスは配信元の OFL / Apache 2.0。
+
 ## キャッシュ戦略
 
 - 通常の SVG: `cache-control: public, max-age=31536000, immutable`。さらに Cloudflare の Cache API でエッジキャッシュに書き込み、2回目以降のリクエストは Worker 実行を経由せず返る。
+- R2 登録済みの Google Fonts SVG: 同じく immutable + Cache API。
+- R2 未登録時のフォールバック: `public, max-age=60, stale-while-revalidate=60`。Cache API には書き込まない（再登録後すぐ切り替わるように）。
 - 動的キーワード: `cache-control: no-store`, `cdn-cache-control: no-store` でブラウザ・CDN・Cache API すべてを回避。
 
 ## 開発
@@ -121,3 +136,6 @@ npm run deploy    # 手動デプロイ（通常はGitHub Actionsが走る）
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
 4. 初回デプロイ後、`wrangler.toml` の `routes` で `icon.soui.dev` がカスタムドメインとして紐付く
+5. **R2 バケット**: Cloudflare ダッシュボードで `cosense-icon-paths` を作成（[wrangler.toml](wrangler.toml) の `bucket_name` と一致させる）
+6. **Turnstile**: ダッシュボードの Turnstile で widget を追加（ドメインに `icon.soui.dev` を登録）。発行された site key を [src/editor.html](src/editor.html) の `TURNSTILE_SITE_KEY_PROD` 定数に、secret key を `wrangler secret put TURNSTILE_SECRET` で登録する
+7. **ローカル開発用 secret**: `.dev.vars` に `TURNSTILE_SECRET=1x0000000000000000000000000000000AA`（Cloudflare 公式の test secret）を書く。editor は `localhost` アクセス時に自動でtest site key に切り替わるので、本番ドメインを Turnstile に登録するだけでOK
