@@ -289,7 +289,7 @@ footer a { color: #94a3b8; }
       <label></label>
       <input type="text" id="fontCustom" placeholder="例: Impact / 'Comic Sans MS' / Futura">
     </div>
-    <p class="help" id="googleFontHelp" style="display:none;">Google Fonts を選択中。右下の「Path化して共有」で URL を有効化する。</p>
+    <p class="help" id="googleFontHelp" style="display:none;">Google Fonts 選択中: URL コピー時に自動的にサーバーへ登録される。</p>
     <div class="field"><label>字サイズ</label>
       <input type="checkbox" id="sizeAuto" checked>
       <span style="color:#94a3b8;font-size:.75rem;flex:none;">自動</span>
@@ -339,16 +339,8 @@ footer a { color: #94a3b8; }
         <input id="markdown" readonly>
         <button type="button" data-copy="markdown">コピー</button>
       </div>
-    </div>
-
-    <div class="panel url-box" id="pathifyPanel" style="display:none;">
-      <h2>Path化して共有 (Google Fonts)</h2>
-      <p class="help">Google Fonts は閲覧者の端末に依存しないよう、Path化して R2 に登録する。</p>
-      <div class="url-row">
-        <button type="button" id="pathifyBtn">Path化して共有</button>
-      </div>
-      <div id="turnstileWidget" class="cf-turnstile" data-callback="onTurnstileToken" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin-top:.5rem;"></div>
-      <p class="help" id="pathifyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
+      <div id="turnstileWidget" class="cf-turnstile" data-callback="onTurnstileToken" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin-top:.75rem; display:none;"></div>
+      <p class="help" id="copyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
     </div>
   </div>
 </main>
@@ -433,7 +425,8 @@ footer a { color: #94a3b8; }
   function updateFontMode() {
     const useGF = isGoogleFont(currentFontValue());
     $('googleFontHelp').style.display = useGF ? '' : 'none';
-    $('pathifyPanel').style.display = useGF ? '' : 'none';
+    $('turnstileWidget').style.display = useGF ? '' : 'none';
+    if (!useGF) $('copyStatus').textContent = '';
   }
 
   function xmlEscape(s) {
@@ -685,55 +678,40 @@ ${pathEls}
     _previewDebounceTimer = setTimeout(renderPathifyPreview, PREVIEW_DEBOUNCE_MS);
   }
 
-  async function pathifyAndRegister() {
-    const status = $('pathifyStatus');
-    const btn = $('pathifyBtn');
+  const _registeredPaths = new Set();
+
+  async function registerCurrentPath(onProgress) {
     const family = currentFontValue();
-    if (!isGoogleFont(family)) {
-      status.textContent = 'Google Fonts から選んでください。';
-      return;
+    if (!isGoogleFont(family)) return;
+
+    const pathname = build();
+    if (_registeredPaths.has(pathname)) return;
+
+    const text = $('text').value || 'sample';
+    const lines = text.split(/\r?\n/);
+    const weight = $('weight').value;
+
+    onProgress && onProgress('フォント取得中...');
+    const font = await ensureFont(family, weight, text);
+
+    onProgress && onProgress('Path 化中...');
+    const svg = buildSvgFromFont(font, lines, collectIconOpts());
+
+    onProgress && onProgress('認証中...');
+    const token = await getTurnstileToken();
+    if (!token) throw new Error('Turnstile 認証失敗。ページを再読み込みしてください。');
+
+    onProgress && onProgress('登録中...');
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pathname, svg, turnstileToken: token }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error('登録失敗 (' + res.status + '): ' + body.slice(0, 120));
     }
-    btn.disabled = true;
-    try {
-      const text = $('text').value || 'sample';
-      const lines = text.split(/\r?\n/);
-      const weight = $('weight').value;
-
-      status.textContent = 'フォント取得中...';
-      const font = await ensureFont(family, weight, text);
-
-      status.textContent = 'Path 化中...';
-      const svg = buildSvgFromFont(font, lines, collectIconOpts());
-
-      status.textContent = '認証中 (Turnstile)...';
-      const token = await getTurnstileToken();
-      if (!token) {
-        status.textContent = '認証失敗。ページを再読み込みしてもう一度。';
-        return;
-      }
-
-      status.textContent = '登録中...';
-      const pathname = build();
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pathname, svg, turnstileToken: token }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        status.textContent = '登録失敗 (' + res.status + '): ' + body;
-        return;
-      }
-
-      await new Promise(r => setTimeout(r, 300));
-      $('preview').src = pathname + '?_=' + Date.now();
-      status.textContent = '登録完了。URL を共有できます。';
-    } catch (e) {
-      console.error(e);
-      status.textContent = 'エラー: ' + (e && e.message ? e.message : String(e));
-    } finally {
-      btn.disabled = false;
-    }
+    _registeredPaths.add(pathname);
   }
 
   const KEY_ALIASES = {
@@ -1079,26 +1057,55 @@ ${pathEls}
     el.addEventListener('input', update)
   );
 
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   document.querySelectorAll('button[data-copy]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const target = $(btn.dataset.copy);
-      try {
-        await navigator.clipboard.writeText(target.value);
-        const original = btn.textContent;
-        btn.classList.add('copied');
-        btn.textContent = 'コピー済';
-        setTimeout(() => {
-          btn.classList.remove('copied');
+      const original = btn.textContent;
+      const status = $('copyStatus');
+      const needsRegister =
+        isGoogleFont(currentFontValue()) &&
+        !_registeredPaths.has(build());
+
+      if (needsRegister) {
+        btn.disabled = true;
+        btn.textContent = '登録中...';
+        try {
+          await registerCurrentPath(msg => { status.textContent = msg; });
+          status.textContent = '登録完了';
+          $('preview').src = build() + '?_=' + Date.now();
+        } catch (e) {
+          console.error(e);
+          status.textContent = 'エラー: ' + (e && e.message ? e.message : String(e));
           btn.textContent = original;
-        }, 1200);
-      } catch {
+          btn.disabled = false;
+          return;
+        }
+        btn.disabled = false;
+      }
+
+      const ok = await copyToClipboard(target.value);
+      if (!ok) {
         target.select();
         document.execCommand('copy');
       }
+      btn.classList.add('copied');
+      btn.textContent = 'コピー済';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = original;
+        if (needsRegister) status.textContent = '';
+      }, 1500);
     });
   });
-
-  $('pathifyBtn').addEventListener('click', pathifyAndRegister);
 
   (function handleRegen() {
     const params = new URLSearchParams(location.search);
@@ -1114,7 +1121,16 @@ ${pathEls}
       applyPathname(pathname);
       update();
       setTimeout(() => {
-        if (isGoogleFont(currentFontValue())) pathifyAndRegister();
+        if (isGoogleFont(currentFontValue())) {
+          registerCurrentPath(msg => { $('copyStatus').textContent = msg; })
+            .then(() => {
+              $('copyStatus').textContent = '登録完了';
+              $('preview').src = build() + '?_=' + Date.now();
+            })
+            .catch(e => {
+              $('copyStatus').textContent = 'エラー: ' + (e && e.message ? e.message : String(e));
+            });
+        }
       }, 800);
     } catch (e) {
       console.error('regen decode failed', e);
