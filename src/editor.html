@@ -347,7 +347,7 @@ footer a { color: #94a3b8; }
       <div class="url-row">
         <button type="button" id="pathifyBtn">Path化して共有</button>
       </div>
-      <div id="turnstile" class="cf-turnstile" data-callback="onTurnstileToken" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin-top:.5rem;"></div>
+      <div id="turnstileWidget" class="cf-turnstile" data-callback="onTurnstileToken" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired" style="margin-top:.5rem;"></div>
       <p class="help" id="pathifyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
     </div>
   </div>
@@ -368,7 +368,7 @@ footer a { color: #94a3b8; }
   const TURNSTILE_SITE_KEY = IS_LOCAL_DEV ? TURNSTILE_SITE_KEY_DEV : TURNSTILE_SITE_KEY_PROD;
 
   (function setupTurnstileWidget() {
-    const el = document.getElementById('turnstile');
+    const el = document.getElementById('turnstileWidget');
     if (el && !el.getAttribute('data-sitekey')) {
       el.setAttribute('data-sitekey', TURNSTILE_SITE_KEY);
     }
