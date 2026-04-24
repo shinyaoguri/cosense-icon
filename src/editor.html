@@ -234,6 +234,68 @@ input[type=range]::-moz-range-thumb {
 .contrast-label.ng { color: #f87171; }
 .custom-font { margin-top: .25rem; display: none; }
 .custom-font.show { display: flex; }
+.font-picker { position: relative; flex: 1; min-width: 0; }
+.font-picker-btn {
+  width: 100%;
+  text-align: left;
+  padding: .35rem .5rem;
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.font-picker-btn:hover { border-color: #64748b; }
+.font-picker-btn:focus { outline: 2px solid #38bdf8; outline-offset: -1px; border-color: transparent; }
+.font-picker-btn .caret { margin-left: auto; opacity: .5; font-size: .75em; flex: none; }
+.font-picker-btn .sample { color: #94a3b8; font-size: .85em; flex: none; }
+.font-picker-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 5px;
+  z-index: 100;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  padding: .25rem;
+}
+.font-picker-group {
+  padding: .45rem .5rem .25rem;
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #64748b;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: #0f172a;
+}
+.font-picker-item {
+  padding: .4rem .55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: .9rem;
+}
+.font-picker-item:hover { background: #1e293b; }
+.font-picker-item.active { background: #334155; }
+.font-picker-item .sample {
+  color: #94a3b8;
+  font-size: .95em;
+  white-space: nowrap;
+  flex: none;
+}
 footer {
   text-align: center;
   padding: 1.5rem;
@@ -414,6 +476,132 @@ footer a { color: #94a3b8; }
       });
       sel.appendChild(og);
     });
+  })();
+
+  let _fontPickerLoaded = false;
+  function loadAllGoogleFontsCss() {
+    if (_fontPickerLoaded) return;
+    _fontPickerLoaded = true;
+    const all = GOOGLE_FONTS.flatMap(([, fonts]) => fonts);
+    const href = 'https://fonts.googleapis.com/css2?' +
+      all.map(f => 'family=' + encodeURIComponent(f)).join('&') +
+      '&display=swap';
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  (function buildFontPicker() {
+    const sel = $('font');
+    sel.style.display = 'none';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'font-picker';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'font-picker-btn';
+    btn.id = 'fontPickerBtn';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'name';
+    const sampleSpan = document.createElement('span');
+    sampleSpan.className = 'sample';
+    const caretSpan = document.createElement('span');
+    caretSpan.className = 'caret';
+    caretSpan.textContent = '▾';
+    btn.appendChild(nameSpan);
+    btn.appendChild(sampleSpan);
+    btn.appendChild(caretSpan);
+
+    const menu = document.createElement('div');
+    menu.className = 'font-picker-menu';
+    menu.hidden = true;
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    sel.parentNode.insertBefore(wrap, sel);
+
+    function addGroup(label) {
+      const el = document.createElement('div');
+      el.className = 'font-picker-group';
+      el.textContent = label;
+      menu.appendChild(el);
+    }
+    function addItem(value, label, previewFamily) {
+      const item = document.createElement('div');
+      item.className = 'font-picker-item';
+      item.dataset.value = value;
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = label;
+      const sample = document.createElement('span');
+      sample.className = 'sample';
+      sample.textContent = 'Aa あ';
+      if (previewFamily) {
+        const ff = `"${previewFamily}", sans-serif`;
+        name.style.fontFamily = ff;
+        sample.style.fontFamily = ff;
+      }
+      item.appendChild(name);
+      item.appendChild(sample);
+      item.addEventListener('click', () => {
+        sel.value = value;
+        sel.dispatchEvent(new Event('input', { bubbles: true }));
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        updatePickerBtn();
+        close();
+      });
+      menu.appendChild(item);
+    }
+
+    addGroup('組み込み');
+    BUILTIN_FONTS.forEach(v => addItem(v, BUILTIN_LABELS[v], null));
+    GOOGLE_FONTS.forEach(([cat, fonts]) => {
+      addGroup('Google Fonts – ' + cat);
+      fonts.forEach(family => addItem(family, family, family));
+    });
+
+    function updatePickerBtn() {
+      const v = sel.value;
+      const label = isBuiltinFont(v) ? (BUILTIN_LABELS[v] || v) : v;
+      nameSpan.textContent = label;
+      if (isGoogleFont(v)) {
+        const ff = `"${v}", sans-serif`;
+        nameSpan.style.fontFamily = ff;
+        sampleSpan.style.fontFamily = ff;
+        sampleSpan.textContent = 'Aa あ';
+      } else {
+        nameSpan.style.fontFamily = '';
+        sampleSpan.style.fontFamily = '';
+        sampleSpan.textContent = '';
+      }
+      menu.querySelectorAll('.font-picker-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.value === v);
+      });
+    }
+
+    function open() {
+      menu.hidden = false;
+      loadAllGoogleFontsCss();
+      const active = menu.querySelector('.font-picker-item.active');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+    function close() { menu.hidden = true; }
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (menu.hidden) open(); else close();
+    });
+    document.addEventListener('click', e => {
+      if (!wrap.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !menu.hidden) close();
+    });
+
+    updatePickerBtn();
+    window._updateFontPickerBtn = updatePickerBtn;
   })();
 
   function currentFontValue() {
@@ -773,6 +961,7 @@ ${pathEls}
           $('fontCustom').value = v;
           $('customFontWrap').classList.add('show');
         }
+        if (window._updateFontPickerBtn) window._updateFontPickerBtn();
         return;
       }
     }
@@ -926,6 +1115,7 @@ ${pathEls}
     $('font').value = initial.font;
     $('fontCustom').value = initial.fontCustom;
     $('customFontWrap').classList.remove('show');
+    if (window._updateFontPickerBtn) window._updateFontPickerBtn();
     update();
   }
 
