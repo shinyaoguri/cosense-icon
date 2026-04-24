@@ -3,23 +3,34 @@ import { initial } from "./state";
 
 export interface Preset {
   name: string;
-  text: string;
+  text: string | (() => string);
   bg?: string;
   fg?: string;
   radius?: number;
+  w?: number;
+  h?: number;
+}
+
+function todayText(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}年\n${m}月${day}日`;
 }
 
 export const presets: Preset[] = [
-  { name: "ゼミ", text: "B4ゼミ", bg: "#1e40af", fg: "#ffffff" },
-  { name: "メモ", text: "メモ", bg: "#fef3c7", fg: "#92400e" },
-  { name: "TODO", text: "TODO", bg: "#0f172a", fg: "#fbbf24" },
-  { name: "会議", text: "議事録", bg: "#0f172a", fg: "#38bdf8" },
-  { name: "雑談", text: "雑談", bg: "#fce7f3", fg: "#9f1239" },
-  { name: "日付", text: "2026年\n04月19日", bg: "#f43f5e", fg: "#ffffff", radius: 32 },
+  { name: "ゼミ", text: "ゼミ", bg: "#1e40af", fg: "#ffffff", w: 600, h: 400 },
+  { name: "メモ", text: "メモ", bg: "#fef3c7", fg: "#92400e", w: 600, h: 400 },
+  { name: "TODO", text: "TODO", bg: "#0f172a", fg: "#fbbf24", w: 900, h: 400 },
+  { name: "議事録", text: "議事録", bg: "#0f172a", fg: "#38bdf8", w: 600, h: 400 },
+  { name: "雑談", text: "雑談", bg: "#fce7f3", fg: "#9f1239", w: 600, h: 400 },
+  { name: "日付", text: todayText, bg: "#f43f5e", fg: "#ffffff", radius: 32, w: 600, h: 400 },
 ];
 
 export function applyPreset(p: Preset, onUpdate: () => void): void {
-  $textarea("text").value = p.text.replace(/\\n/g, "\n");
+  const rawText = typeof p.text === "function" ? p.text() : p.text;
+  $textarea("text").value = rawText.replace(/\\n/g, "\n");
   if (p.bg) {
     $input("bg").value = p.bg;
     $input("bgHex").value = p.bg;
@@ -30,6 +41,14 @@ export function applyPreset(p: Preset, onUpdate: () => void): void {
   }
   $input("radius").value = String(p.radius || 0);
   $input("radiusRange").value = String(p.radius || 0);
+  if (typeof p.w === "number") {
+    $input("w").value = String(p.w);
+    $input("wRange").value = String(p.w);
+  }
+  if (typeof p.h === "number") {
+    $input("h").value = String(p.h);
+    $input("hRange").value = String(p.h);
+  }
   onUpdate();
 }
 

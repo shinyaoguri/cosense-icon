@@ -71,19 +71,46 @@ export function buildFontPicker(): void {
   btn.appendChild(sampleSpan);
   btn.appendChild(caretSpan);
 
+  // overlay と menu は body 直下に（panel scroll に閉じ込められないよう）
+  const overlay = document.createElement("div");
+  overlay.className = "font-picker-overlay";
+  overlay.hidden = true;
+  document.body.appendChild(overlay);
+
   const menu = document.createElement("div");
   menu.className = "font-picker-menu";
   menu.hidden = true;
 
+  const titleBar = document.createElement("div");
+  titleBar.className = "font-picker-menu-title";
+  const titleLabel = document.createElement("span");
+  titleLabel.textContent = "フォントを選択";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "font-picker-close";
+  closeBtn.textContent = "閉じる";
+  titleBar.appendChild(titleLabel);
+  titleBar.appendChild(closeBtn);
+  menu.appendChild(titleBar);
+
+  const scroll = document.createElement("div");
+  scroll.className = "font-picker-menu-scroll";
+  menu.appendChild(scroll);
+
+  document.body.appendChild(menu);
+
   wrap.appendChild(btn);
-  wrap.appendChild(menu);
   sel.parentNode!.insertBefore(wrap, sel);
 
+  let currentItems: HTMLDivElement | null = null;
   function addGroup(label: string): void {
     const el = document.createElement("div");
     el.className = "font-picker-group";
     el.textContent = label;
-    menu.appendChild(el);
+    scroll.appendChild(el);
+    currentItems = document.createElement("div");
+    currentItems.className = "font-picker-items";
+    scroll.appendChild(currentItems);
   }
   function addItem(value: string, label: string, previewFamily: string | null): void {
     const item = document.createElement("div");
@@ -109,7 +136,7 @@ export function buildFontPicker(): void {
       updatePickerBtn();
       close();
     });
-    menu.appendChild(item);
+    (currentItems ?? scroll).appendChild(item);
   }
 
   addGroup("組み込み");
@@ -133,19 +160,21 @@ export function buildFontPicker(): void {
       sampleSpan.style.fontFamily = "";
       sampleSpan.textContent = "";
     }
-    menu.querySelectorAll<HTMLElement>(".font-picker-item").forEach(el => {
+    scroll.querySelectorAll<HTMLElement>(".font-picker-item").forEach(el => {
       el.classList.toggle("active", el.dataset["value"] === v);
     });
   }
 
   function open(): void {
     menu.hidden = false;
+    overlay.hidden = false;
     loadAllGoogleFontsCss();
-    const active = menu.querySelector<HTMLElement>(".font-picker-item.active");
-    if (active) active.scrollIntoView({ block: "nearest" });
+    const active = scroll.querySelector<HTMLElement>(".font-picker-item.active");
+    if (active) active.scrollIntoView({ block: "center" });
   }
   function close(): void {
     menu.hidden = true;
+    overlay.hidden = true;
   }
 
   btn.addEventListener("click", e => {
@@ -153,9 +182,8 @@ export function buildFontPicker(): void {
     if (menu.hidden) open();
     else close();
   });
-  document.addEventListener("click", e => {
-    if (!wrap.contains(e.target as Node)) close();
-  });
+  overlay.addEventListener("click", close);
+  closeBtn.addEventListener("click", close);
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && !menu.hidden) close();
   });
