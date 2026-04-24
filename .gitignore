@@ -8,5 +8,7 @@ dist/
 .DS_Store
 *.log
 coverage/
+# editor build output
+src/editor.html
 .claude/settings.local.json
 .claude/*.lock
