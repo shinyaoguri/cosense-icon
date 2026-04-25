@@ -60,6 +60,13 @@ export function applyColors(bg: string, fg: string, onUpdate: () => void): void 
   onUpdate();
 }
 
+export function applyFont(value: string, onUpdate: () => void): void {
+  $select("font").value = value;
+  $("customFontWrap").classList.toggle("show", value === "custom");
+  if (window._updateFontPickerBtn) window._updateFontPickerBtn();
+  onUpdate();
+}
+
 export function renderPresets(onApply: (p: Preset) => void): void {
   const wrap = $("presets");
   presets.forEach(p => {

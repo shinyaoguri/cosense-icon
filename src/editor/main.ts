@@ -1,6 +1,6 @@
-import { $, $input, $select } from "./dom";
+import { $, $input, $select, $textarea } from "./dom";
 import { updateContrast, randomPalette } from "./colors";
-import { isGoogleFont } from "./fonts";
+import { isGoogleFont, randomFont } from "./fonts";
 import { buildFontPicker, populateHiddenFontSelect } from "./fontPicker";
 import { applyPathname } from "./pathname";
 import {
@@ -9,32 +9,42 @@ import {
   schedulePathifyPreview,
   setPreviewToUrl,
 } from "./preview";
-import { applyColors, applyPreset, renderPresets, resetForm } from "./presets";
+import {
+  applyColors,
+  applyFont,
+  applyPreset,
+  renderPresets,
+  resetForm,
+} from "./presets";
 import { registerCurrentPath, registeredPaths } from "./register";
 import {
   build,
   currentFontValue,
-  updateFontMode,
 } from "./state";
 import { setupTurnstileWidget } from "./turnstile";
 
-// ---- Turnstile callbacks (global) ----
-window.onTurnstileToken = token => {
-  window._turnstileToken = token;
-  if (window._turnstileTokenResolve) {
-    const r = window._turnstileTokenResolve;
-    window._turnstileTokenResolve = null;
-    r(token);
-  }
-};
-window.onTurnstileError = () => {
-  window._turnstileToken = null;
-};
-window.onTurnstileExpired = () => {
-  window._turnstileToken = null;
-};
-window._turnstileToken = null;
-window._turnstileTokenResolve = null;
+function updateRegisterUI(): void {
+  const useGF = isGoogleFont(currentFontValue());
+  const registered = useGF && registeredPaths.has(build());
+
+  $("googleFontHelp").style.display = useGF ? "" : "none";
+  if (!useGF) $("copyStatus").textContent = "";
+
+  document
+    .querySelectorAll<HTMLButtonElement>("button[data-copy]")
+    .forEach(btn => {
+      // コピー直後の "コピー済" 表示中は触らない
+      if (btn.classList.contains("copied")) return;
+      btn.disabled = false;
+      if (useGF && !registered) {
+        btn.classList.add("needs-register");
+        btn.textContent = "登録してコピー";
+      } else {
+        btn.classList.remove("needs-register");
+        btn.textContent = "コピー";
+      }
+    });
+}
 
 // ---- init ----
 setupTurnstileWidget();
@@ -48,7 +58,7 @@ function update(): void {
   $input("cosense").value = "[" + full + "]";
   $input("markdown").value = "![icon](" + full + ")";
   updateContrast();
-  updateFontMode();
+  updateRegisterUI();
 
   if (isGoogleFont(currentFontValue())) {
     schedulePathifyPreview();
@@ -112,6 +122,10 @@ $("random").addEventListener("click", () => {
   const p = randomPalette();
   applyColors(p.bg, p.fg, update);
 });
+$("randomFont").addEventListener("click", () => {
+  const f = randomFont($textarea("text").value, currentFontValue());
+  applyFont(f, update);
+});
 
 renderPresets(p => applyPreset(p, update));
 
@@ -132,15 +146,16 @@ document
   .querySelectorAll<HTMLButtonElement>("button[data-copy]")
   .forEach(btn => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
       const targetId = btn.dataset["copy"];
       if (!targetId) return;
       const target = document.getElementById(targetId) as HTMLInputElement;
-      const original = btn.textContent ?? "";
       const status = $("copyStatus");
       const needsRegister =
         isGoogleFont(currentFontValue()) && !registeredPaths.has(build());
 
       if (needsRegister) {
+        btn.classList.remove("needs-register");
         btn.disabled = true;
         btn.textContent = "登録中...";
         try {
@@ -153,11 +168,9 @@ document
           console.error(e);
           status.textContent =
             "エラー: " + (e instanceof Error ? e.message : String(e));
-          btn.textContent = original;
-          btn.disabled = false;
+          updateRegisterUI();
           return;
         }
-        btn.disabled = false;
       }
 
       const ok = await copyToClipboard(target.value);
@@ -165,12 +178,14 @@ document
         target.select();
         document.execCommand("copy");
       }
+      btn.classList.remove("needs-register");
       btn.classList.add("copied");
+      btn.disabled = false;
       btn.textContent = "コピー済";
       setTimeout(() => {
         btn.classList.remove("copied");
-        btn.textContent = original;
         if (needsRegister) status.textContent = "";
+        updateRegisterUI();
       }, 1500);
     });
   });
@@ -196,10 +211,12 @@ document
           .then(() => {
             $("copyStatus").textContent = "登録完了";
             setPreviewToUrl(build() + "?_=" + Date.now());
+            updateRegisterUI();
           })
           .catch(e => {
             $("copyStatus").textContent =
               "エラー: " + (e instanceof Error ? e.message : String(e));
+            updateRegisterUI();
           });
       }
     }, 800);

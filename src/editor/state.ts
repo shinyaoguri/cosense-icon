@@ -1,5 +1,4 @@
-import { $, $input, $select, $textarea } from "./dom";
-import { isGoogleFont } from "./fonts";
+import { $input, $select, $textarea } from "./dom";
 
 export interface Defaults {
   bg: string;
@@ -85,13 +84,6 @@ export function currentFontValue(): string {
   const v = $select("font").value;
   if (v === "custom") return $input("fontCustom").value.trim();
   return v;
-}
-
-export function updateFontMode(): void {
-  const useGF = isGoogleFont(currentFontValue());
-  $("googleFontHelp").style.display = useGF ? "" : "none";
-  $("turnstileWidget").style.display = useGF ? "" : "none";
-  if (!useGF) $("copyStatus").textContent = "";
 }
 
 export function build(): string {

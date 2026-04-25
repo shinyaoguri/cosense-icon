@@ -16,6 +16,7 @@ export interface TurnstileGlobal {
   render(selector: string | HTMLElement, options: Record<string, unknown>): string;
   remove(widgetId?: string): void;
   reset(widgetId?: string): void;
+  execute(widgetId?: string, options?: Record<string, unknown>): void;
   getResponse(widgetId?: string): string | null;
 }
 
@@ -27,11 +28,7 @@ declare global {
     opentype: OpenTypeGlobal;
     turnstile?: TurnstileGlobal;
     Module?: { decompress: (data: Uint8Array) => Uint8Array };
-    _turnstileToken: string | null;
-    _turnstileTokenResolve: ((token: string) => void) | null;
-    onTurnstileToken: (token: string) => void;
-    onTurnstileError: () => void;
-    onTurnstileExpired: () => void;
+    onloadTurnstileCallback?: () => void;
     _updateFontPickerBtn?: () => void;
   }
 }

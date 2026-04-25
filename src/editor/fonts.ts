@@ -31,3 +31,28 @@ export function isGoogleFont(v: string): boolean {
 export function isBuiltinFont(v: string): v is BuiltinFont {
   return (BUILTIN_FONTS as readonly string[]).includes(v);
 }
+
+// ひらがな・カタカナ・CJK 統合漢字（拡張A含む）の有無で判定
+const JP_RE = /[぀-ゟ゠-ヿ㐀-䶿一-鿿豈-﫿]/;
+export function hasJapanese(s: string): boolean {
+  return JP_RE.test(s);
+}
+
+const JP_FONT_GROUPS = new Set(["日本語 Sans", "日本語 Serif", "日本語 Display"]);
+
+export function randomFont(text: string, current?: string): string {
+  const isJp = hasJapanese(text);
+  const pool: string[] = [];
+  // builtin: custom は除外、日本語なら mono も外す
+  pool.push("sans", "serif", "rounded");
+  if (!isJp) pool.push("mono");
+  // Google Fonts: 日本語テキストなら日本語グループのみ
+  for (const [cat, fonts] of GOOGLE_FONTS) {
+    if (isJp && !JP_FONT_GROUPS.has(cat)) continue;
+    pool.push(...fonts);
+  }
+  // 現在のフォントは除外して必ず変わるように
+  const filtered = current ? pool.filter(f => f !== current) : pool;
+  const arr = filtered.length > 0 ? filtered : pool;
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
