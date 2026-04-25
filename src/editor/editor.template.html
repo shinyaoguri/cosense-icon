@@ -446,6 +446,16 @@ input[type=range]::-moz-range-thumb {
   font: inherit;
   line-height: 1.2;
   transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.preset-btn .dice-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: none;
 }
 .preset-btn:hover {
   border-color: var(--accent);
@@ -740,6 +750,19 @@ footer a:hover { color: var(--accent); }
   color: #1a1207;
 }
 .url-row button.needs-register:hover { background: #fcd34d; }
+
+/* 配色フィールド: 2行の右に行をまたぐランダムボタン */
+.color-fields {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 0.6rem;
+}
+.color-fields > .field { grid-column: 1; }
+.color-fields > .color-random-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
 </style>
 </head>
 <body>
@@ -759,12 +782,14 @@ footer a:hover { color: var(--accent); }
       <textarea id="text" placeholder="改行可(Enter)">sample</textarea>
     </div>
 
-    <div class="row-head">
-      <h2 style="margin:0;">配色</h2>
-      <button type="button" id="random" class="preset-btn random-btn">↻ ランダム</button>
+    <h2>配色</h2>
+    <div class="color-fields">
+      <div class="field"><label>背景</label><input type="color" id="bg" value="#1e40af"><input type="text" id="bgHex" value="#1e40af"></div>
+      <div class="field"><label>文字</label><input type="color" id="fg" value="#ffffff"><input type="text" id="fgHex" value="#ffffff"></div>
+      <button type="button" id="random" class="preset-btn random-btn color-random-btn" title="ランダムな配色 (WCAG AA)" aria-label="ランダムな配色">
+        <svg class="dice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg>
+      </button>
     </div>
-    <div class="field"><label>背景</label><input type="color" id="bg" value="#1e40af"><input type="text" id="bgHex" value="#1e40af"></div>
-    <div class="field"><label>文字</label><input type="color" id="fg" value="#ffffff"><input type="text" id="fgHex" value="#ffffff"></div>
     <div class="contrast-label" id="contrastLabel"></div>
 
     <h2>サイズ</h2>
@@ -781,12 +806,12 @@ footer a:hover { color: var(--accent); }
       <input type="range" id="radiusRange" min="0" max="500" step="1" value="0">
       <input type="number" id="radius" value="0" min="0" max="500"><span class="unit">px</span></div>
 
-    <div class="row-head">
-      <h2 style="margin:0;">文字</h2>
-      <button type="button" id="randomFont" class="preset-btn random-btn">↻ ランダム</button>
-    </div>
+    <h2>文字</h2>
     <div class="field"><label>フォント</label>
       <select id="font"></select>
+      <button type="button" id="randomFont" class="preset-btn random-btn" title="フォントをランダム選択" aria-label="フォントをランダム選択">
+        <svg class="dice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg>
+      </button>
     </div>
     <div class="field custom-font" id="customFontWrap">
       <label></label>
