@@ -10,6 +10,12 @@ import {
   setPreviewToUrl,
 } from "./preview";
 import {
+  applyPreviewPadding,
+  applyPreviewRadius,
+  applyPreviewSize,
+  setupPreviewResize,
+} from "./previewResize";
+import {
   applyColors,
   applyFont,
   applyPreset,
@@ -50,6 +56,7 @@ function updateRegisterUI(): void {
 setupTurnstileWidget();
 populateHiddenFontSelect();
 buildFontPicker();
+setupPreviewResize(() => update());
 
 function update(): void {
   const path = build();
@@ -57,6 +64,9 @@ function update(): void {
   $input("url").value = full;
   $input("cosense").value = "[" + full + "]";
   $input("markdown").value = "![icon](" + full + ")";
+  applyPreviewSize(+$input("w").value, +$input("h").value);
+  applyPreviewPadding(+$input("padding").value);
+  applyPreviewRadius(+$input("radius").value);
   updateContrast();
   updateRegisterUI();
 

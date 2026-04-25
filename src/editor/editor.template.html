@@ -350,16 +350,117 @@ input[type=range]::-moz-range-thumb {
   background: radial-gradient(ellipse at center, transparent 30%, rgba(8, 12, 24, 0.75) 100%);
   pointer-events: none;
 }
-.preview-box img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  box-shadow: var(--shadow-lg);
-  display: block;
-  border-radius: 2px;
+.preview-frame {
   position: relative;
   z-index: 1;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
 }
+.preview-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  box-shadow: var(--shadow-lg);
+  border-radius: 2px;
+}
+/* 選択枠 (PowerPoint 風) */
+.preview-frame::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+  z-index: 2;
+}
+.preview-box:hover .preview-frame::before,
+.preview-frame.dragging::before { opacity: 0.85; }
+
+/* リサイズハンドル: 8 個の小さな白丸 */
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 120ms, transform 120ms;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  touch-action: none;
+}
+.preview-box:hover .resize-handle,
+.resize-handle.dragging { opacity: 1; }
+.resize-handle:hover { transform: scale(1.3); }
+.resize-handle.dragging { transform: scale(1.3); }
+
+/* 四隅 */
+.handle-tl { top: -6px; left: -6px; cursor: nwse-resize; }
+.handle-tr { top: -6px; right: -6px; cursor: nesw-resize; }
+.handle-bl { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.handle-br { bottom: -6px; right: -6px; cursor: nwse-resize; }
+/* 各辺中点 */
+.handle-t { top: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+.handle-b { bottom: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+.handle-l { left: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+.handle-r { right: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+
+/* 余白 (padding) ガイドとハンドル */
+.padding-frame {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  opacity: 0;
+  transition: opacity 120ms;
+  z-index: 2;
+}
+.preview-box:hover .padding-frame,
+.preview-frame.dragging .padding-frame { opacity: 0.5; }
+.padding-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 120ms, transform 120ms;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+.preview-box:hover .padding-handle,
+.padding-handle.dragging { opacity: 1; }
+.padding-handle:hover { transform: scale(1.3); }
+.padding-handle.dragging { transform: scale(1.3); }
+.handle-pad-tl { top: -5px; left: -5px; cursor: nwse-resize; }
+.handle-pad-br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+/* 角丸ハンドル (PowerPoint 風 黄色) */
+.radius-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--warn);
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 120ms, transform 120ms;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  cursor: nwse-resize;
+  margin: -5px 0 0 -5px;
+}
+.preview-box:hover .radius-handle,
+.radius-handle.dragging { opacity: 1; }
+.radius-handle:hover { transform: scale(1.3); }
+.radius-handle.dragging { transform: scale(1.3); }
 .preview-wrap > .panel { flex: none; }
 
 /* URL box */
@@ -849,7 +950,24 @@ footer a:hover { color: var(--accent); }
   </form>
 
   <div class="preview-wrap">
-    <div class="preview-box"><img id="preview" alt="preview"></div>
+    <div class="preview-box">
+      <div id="previewFrame" class="preview-frame">
+        <img id="preview" alt="preview">
+        <div id="resizeTL" class="resize-handle handle-tl"></div>
+        <div id="resizeT"  class="resize-handle handle-t"></div>
+        <div id="resizeTR" class="resize-handle handle-tr"></div>
+        <div id="resizeL"  class="resize-handle handle-l"></div>
+        <div id="resizeR"  class="resize-handle handle-r"></div>
+        <div id="resizeBL" class="resize-handle handle-bl"></div>
+        <div id="resizeB"  class="resize-handle handle-b"></div>
+        <div id="resizeBR" class="resize-handle handle-br"></div>
+        <div id="paddingFrame" class="padding-frame">
+          <div id="paddingTL" class="padding-handle handle-pad-tl"></div>
+          <div id="paddingBR" class="padding-handle handle-pad-br"></div>
+        </div>
+        <div id="radiusHandle" class="radius-handle" title="角丸を変更"></div>
+      </div>
+    </div>
 
     <div class="panel url-box">
       <h2>画像URL</h2>
