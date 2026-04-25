@@ -36,9 +36,19 @@ export function renderSvg(lines: string[], opts: IconOptions): string {
   const lineHeight = opts.lineHeight;
   const fontSize = opts.fontSize ?? estimateFontSize(lines, innerW, innerH, lineHeight);
 
-  const anchor = align === "left" ? "start" : align === "right" ? "end" : "middle";
+  const isJustify = align === "justify";
+  const anchor =
+    align === "left" || isJustify
+      ? "start"
+      : align === "right"
+      ? "end"
+      : "middle";
   const textX =
-    align === "left" ? padding : align === "right" ? width - padding : width / 2;
+    align === "left" || isJustify
+      ? padding
+      : align === "right"
+      ? width - padding
+      : width / 2;
 
   const totalTextHeight = fontSize * lineHeight * lines.length;
   const startY = (height - totalTextHeight) / 2 + fontSize * lineHeight * 0.8;
@@ -46,7 +56,12 @@ export function renderSvg(lines: string[], opts: IconOptions): string {
   const tspans = lines
     .map((line, i) => {
       const dy = i === 0 ? 0 : fontSize * lineHeight;
-      return `<tspan x="${textX}" dy="${dy}">${escapeXml(line)}</tspan>`;
+      // 両端揃え: 2文字以上ある行のみ innerW いっぱいに spacing 引き伸ばし
+      const justifyAttr =
+        isJustify && line.length > 1
+          ? ` textLength="${innerW}" lengthAdjust="spacing"`
+          : "";
+      return `<tspan x="${textX}" dy="${dy}"${justifyAttr}>${escapeXml(line)}</tspan>`;
     })
     .join("");
 

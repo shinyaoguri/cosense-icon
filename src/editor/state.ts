@@ -37,7 +37,7 @@ export interface InitialValues extends Defaults {
 
 export const initial: InitialValues = {
   ...defaults,
-  text: "B4ゼミ",
+  text: "",
   bg: "#1e40af",
   fg: "#ffffff",
   w: 600,

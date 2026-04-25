@@ -82,19 +82,20 @@ export function updateContrast(): void {
   const fg = hexToRgb($input("fg").value);
   const r = contrastRatio(bg, fg);
   const el = $("contrastLabel");
-  const rounded = r.toFixed(2);
   el.classList.remove("ok", "warn", "ng");
-  if (r >= 7) {
-    el.textContent = "コントラスト比 " + rounded + " : 1 (AAA)";
-    el.classList.add("ok");
-  } else if (r >= 4.5) {
-    el.textContent = "コントラスト比 " + rounded + " : 1 (AA)";
-    el.classList.add("ok");
-  } else if (r >= 3) {
-    el.textContent = "コントラスト比 " + rounded + " : 1 (大きな文字のみ可)";
+  // AA (4.5) 以上は表示しない。それ未満のときだけ警告
+  if (r >= 4.5) {
+    el.hidden = true;
+    el.textContent = "";
+    return;
+  }
+  el.hidden = false;
+  const rounded = r.toFixed(2);
+  if (r >= 3) {
+    el.textContent = "コントラスト比 " + rounded + " : 1 — 小さい文字は読みづらい";
     el.classList.add("warn");
   } else {
-    el.textContent = "コントラスト比 " + rounded + " : 1 (読みにくい)";
+    el.textContent = "コントラスト比 " + rounded + " : 1 — 読みにくい配色";
     el.classList.add("ng");
   }
 }

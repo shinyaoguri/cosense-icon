@@ -13,20 +13,31 @@ export function applyPreviewSize(w: number, h: number): void {
   frame.style.aspectRatio = `${w} / ${h}`;
 }
 
+// サイズハンドル(角)と十分離して常に押せるようにする最小オフセット
+const MIN_HANDLE_OFFSET = 14;
+
 export function applyPreviewPadding(p: number): void {
   const pf = document.getElementById("paddingFrame");
-  if (!pf) return;
-  pf.style.top = p + "px";
-  pf.style.left = p + "px";
-  pf.style.right = p + "px";
-  pf.style.bottom = p + "px";
+  if (pf) {
+    pf.style.top = p + "px";
+    pf.style.left = p + "px";
+    pf.style.right = p + "px";
+    pf.style.bottom = p + "px";
+  }
+  const handle = document.getElementById("paddingHandle");
+  if (handle) {
+    const off = Math.max(p, MIN_HANDLE_OFFSET);
+    handle.style.bottom = off + "px";
+    handle.style.right = off + "px";
+  }
 }
 
 export function applyPreviewRadius(r: number): void {
   const handle = document.getElementById("radiusHandle");
   if (!handle) return;
-  handle.style.top = r + "px";
-  handle.style.left = r + "px";
+  const off = Math.max(r, MIN_HANDLE_OFFSET);
+  handle.style.top = off + "px";
+  handle.style.left = off + "px";
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -37,6 +48,11 @@ function setNum(id: string, v: number): void {
   $input(id).value = String(v);
   const range = document.getElementById(id + "Range") as HTMLInputElement | null;
   if (range) range.value = String(v);
+}
+
+function setReadout(text: string): void {
+  const el = document.getElementById("sizeReadout");
+  if (el) el.textContent = text;
 }
 
 type Direction = { x?: 1 | -1; y?: 1 | -1 };
@@ -85,11 +101,7 @@ function setupHandle(id: string, dir: Direction, onUpdate: () => void): void {
   });
 }
 
-function setupPaddingHandle(
-  id: string,
-  kind: "tl" | "br",
-  onUpdate: () => void,
-): void {
+function setupPaddingHandle(id: string, onUpdate: () => void): void {
   const handle = document.getElementById(id);
   if (!handle) return;
 
@@ -111,16 +123,16 @@ function setupPaddingHandle(
     const startY = e.clientY;
     // 余白を増やしすぎて画像領域が消えないよう、min(w,h)/2 - 1 を上限
     const maxPad = Math.max(0, Math.floor(Math.min(startW, startH) / 2) - 1);
-    // tl: 内側 (右下) に動かすと padding 増 → +
-    // br: 内側 (左上) に動かすと padding 増 → -
-    const sign = kind === "tl" ? 1 : -1;
 
     const onMove = (ev: PointerEvent): void => {
+      // 右下ハンドル: 左上方向へドラッグ (-dx, -dy) で padding 増
       const dx = (ev.clientX - startX) / scaleX;
       const dy = (ev.clientY - startY) / scaleY;
-      const delta = ((dx + dy) * sign) / 2;
-      setNum("padding", clamp(Math.round(startPad + delta), 0, maxPad));
+      const delta = -(dx + dy) / 2;
+      const newPad = clamp(Math.round(startPad + delta), 0, maxPad);
+      setNum("padding", newPad);
       onUpdate();
+      setReadout(`余白 ${newPad} px`);
     };
     const onUp = (): void => {
       handle.removeEventListener("pointermove", onMove);
@@ -162,8 +174,10 @@ function setupRadiusHandle(id: string, onUpdate: () => void): void {
       const dy = (ev.clientY - startY) / scaleY;
       // 右下方向にドラッグで radius 増、左上方向で減
       const delta = (dx + dy) / 2;
-      setNum("radius", clamp(Math.round(startR + delta), 0, maxR));
+      const newR = clamp(Math.round(startR + delta), 0, maxR);
+      setNum("radius", newR);
       onUpdate();
+      setReadout(`角丸 ${newR} px`);
     };
     const onUp = (): void => {
       handle.removeEventListener("pointermove", onMove);
@@ -189,9 +203,8 @@ export function setupPreviewResize(onUpdate: () => void): void {
   setupHandle("resizeB", { y: 1 }, onUpdate);
   setupHandle("resizeL", { x: -1 }, onUpdate);
   setupHandle("resizeR", { x: 1 }, onUpdate);
-  // 余白
-  setupPaddingHandle("paddingTL", "tl", onUpdate);
-  setupPaddingHandle("paddingBR", "br", onUpdate);
-  // 角丸
+  // 余白 (右下に1つ)
+  setupPaddingHandle("paddingHandle", onUpdate);
+  // 角丸 (左上に1つ)
   setupRadiusHandle("radiusHandle", onUpdate);
 }

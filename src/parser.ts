@@ -10,7 +10,7 @@ export type IconOptions = {
   radius: number;
   lineHeight: number;
   letterSpacing?: number;
-  align: "left" | "center" | "right";
+  align: "left" | "center" | "right" | "justify";
   timezone?: string;
 };
 
@@ -152,7 +152,7 @@ function parseNumber(v: string): number | null {
 
 function parseAlign(v: string): IconOptions["align"] | null {
   const t = v.toLowerCase();
-  if (t === "left" || t === "center" || t === "right") return t;
+  if (t === "left" || t === "center" || t === "right" || t === "justify") return t;
   return null;
 }
 

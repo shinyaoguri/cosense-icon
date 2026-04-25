@@ -15,13 +15,7 @@ import {
   applyPreviewSize,
   setupPreviewResize,
 } from "./previewResize";
-import {
-  applyColors,
-  applyFont,
-  applyPreset,
-  renderPresets,
-  resetForm,
-} from "./presets";
+import { applyColors, applyFont } from "./presets";
 import { registerCurrentPath, registeredPaths } from "./register";
 import {
   build,
@@ -32,9 +26,15 @@ import { setupTurnstileWidget } from "./turnstile";
 function updateRegisterUI(): void {
   const useGF = isGoogleFont(currentFontValue());
   const registered = useGF && registeredPaths.has(build());
+  const pending = useGF && !registered;
 
-  $("googleFontHelp").style.display = useGF ? "" : "none";
+  $("fontInfoTip").classList.toggle("show", useGF);
   if (!useGF) $("copyStatus").textContent = "";
+
+  // URL 表示はまだ生成されていない状態であることを視覚的に伝える
+  document
+    .querySelectorAll<HTMLInputElement>(".url-row input")
+    .forEach(inp => inp.classList.toggle("pending", pending));
 
   document
     .querySelectorAll<HTMLButtonElement>("button[data-copy]")
@@ -42,9 +42,9 @@ function updateRegisterUI(): void {
       // コピー直後の "コピー済" 表示中は触らない
       if (btn.classList.contains("copied")) return;
       btn.disabled = false;
-      if (useGF && !registered) {
+      if (pending) {
         btn.classList.add("needs-register");
-        btn.textContent = "登録してコピー";
+        btn.textContent = "URL生成・コピー";
       } else {
         btn.classList.remove("needs-register");
         btn.textContent = "コピー";
@@ -64,9 +64,14 @@ function update(): void {
   $input("url").value = full;
   $input("cosense").value = "[" + full + "]";
   $input("markdown").value = "![icon](" + full + ")";
-  applyPreviewSize(+$input("w").value, +$input("h").value);
+  const w = +$input("w").value;
+  const h = +$input("h").value;
+  applyPreviewSize(w, h);
   applyPreviewPadding(+$input("padding").value);
   applyPreviewRadius(+$input("radius").value);
+  const readout = document.getElementById("sizeReadout");
+  if (readout) readout.textContent = `${w} × ${h} px`;
+  syncAlignSegmented();
   updateContrast();
   updateRegisterUI();
 
@@ -91,7 +96,7 @@ function linkSliderNumber(sliderId: string, numberId: string): void {
     update();
   });
 }
-(["w", "h", "padding", "radius", "size", "lh", "ls"] as const).forEach(k =>
+(["size", "lh", "ls"] as const).forEach(k =>
   linkSliderNumber(k + "Range", k),
 );
 
@@ -119,6 +124,30 @@ $input("sizeAuto").addEventListener("change", () => {
   update();
 });
 
+// 揃え segmented control
+function syncAlignSegmented(): void {
+  const v = $select("align").value;
+  document
+    .querySelectorAll<HTMLButtonElement>("#alignSeg .align-seg")
+    .forEach(btn => {
+      const active = btn.dataset["value"] === v;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-checked", String(active));
+    });
+}
+document
+  .querySelectorAll<HTMLButtonElement>("#alignSeg .align-seg")
+  .forEach(btn => {
+    btn.addEventListener("click", () => {
+      const v = btn.dataset["value"];
+      if (!v) return;
+      $select("align").value = v;
+      syncAlignSegmented();
+      update();
+    });
+  });
+syncAlignSegmented();
+
 $select("font").addEventListener("change", () => {
   $("customFontWrap").classList.toggle(
     "show",
@@ -127,17 +156,25 @@ $select("font").addEventListener("change", () => {
   update();
 });
 
-$("reset").addEventListener("click", () => resetForm(update));
+function spinDice(btnId: string): void {
+  const icon = document.querySelector<HTMLElement>(`#${btnId} .dice-icon`);
+  if (!icon) return;
+  // 進行中のアニメをキャンセルしてクラスを外し、次フレームで再付与
+  icon.getAnimations().forEach(a => a.cancel());
+  icon.classList.remove("spinning");
+  requestAnimationFrame(() => icon.classList.add("spinning"));
+}
+
 $("random").addEventListener("click", () => {
+  spinDice("random");
   const p = randomPalette();
   applyColors(p.bg, p.fg, update);
 });
 $("randomFont").addEventListener("click", () => {
+  spinDice("randomFont");
   const f = randomFont($textarea("text").value, currentFontValue());
   applyFont(f, update);
 });
-
-renderPresets(p => applyPreset(p, update));
 
 document
   .querySelectorAll<HTMLElement>("input, select, textarea")
