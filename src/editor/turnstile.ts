@@ -14,12 +14,29 @@ export function setupTurnstileWidget(): void {
   }
 }
 
+// Turnstile のトークンは single-use。返した瞬間に消費扱いにし、
+// widget をリセットして次のトークンを発行させる。
+function consumeToken(token: string): string {
+  window._turnstileToken = null;
+  try {
+    window.turnstile?.reset();
+  } catch (e) {
+    console.error("turnstile.reset failed", e);
+  }
+  return token;
+}
+
 export function getTurnstileToken(): Promise<string> {
-  if (window._turnstileToken) return Promise.resolve(window._turnstileToken);
+  if (window._turnstileToken) {
+    return Promise.resolve(consumeToken(window._turnstileToken));
+  }
   return new Promise((resolve, reject) => {
-    window._turnstileTokenResolve = resolve;
+    const wrapped = (token: string): void => {
+      resolve(consumeToken(token));
+    };
+    window._turnstileTokenResolve = wrapped;
     setTimeout(() => {
-      if (window._turnstileTokenResolve === resolve) {
+      if (window._turnstileTokenResolve === wrapped) {
         window._turnstileTokenResolve = null;
         reject(
           new Error("Turnstile トークン取得タイムアウト。ページを再読込してもう一度。"),

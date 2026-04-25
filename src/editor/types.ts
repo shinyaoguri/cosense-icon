@@ -15,6 +15,7 @@ export interface OpenTypeGlobal {
 export interface TurnstileGlobal {
   render(selector: string | HTMLElement, options: Record<string, unknown>): string;
   remove(widgetId?: string): void;
+  reset(widgetId?: string): void;
   getResponse(widgetId?: string): string | null;
 }
 
