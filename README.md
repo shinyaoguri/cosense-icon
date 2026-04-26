@@ -240,3 +240,13 @@ scripts/
 test/
 └─ *.test.ts          parser / svg / dynamic / registry / random
 ```
+
+## ライセンス
+
+[MIT License](LICENSE) — Copyright (c) 2026 Shinya Oguri
+
+このプロジェクトが利用している主な OSS:
+
+- [opentype.js](https://github.com/opentypejs/opentype.js) (MIT)
+- [wawoff2](https://github.com/fontello/wawoff2) (MIT)
+- [Google Fonts](https://fonts.google.com/) ファミリ各種 (OFL / Apache 2.0)
