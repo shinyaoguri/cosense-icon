@@ -57,16 +57,24 @@ describe("withErrorMarker", () => {
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect/></svg>`;
 
-  it("マーカー用の <g> を挿入する", () => {
+  it("クリック可能な警告チップを挿入する", () => {
     const out = withErrorMarker(base, 600, 400, "/?regen=x");
-    expect(out).toContain("<g opacity=");
-    expect(out).toContain("path未生成");
+    expect(out).toContain('class="ic-warn"');
+    expect(out).toContain('href="/?regen=x"');
+    expect(out).toContain("エディタで再生成");
   });
 
-  it("再生成URLをtitleとコメントに含める", () => {
+  it("再生成URLをhrefとコメントに含める", () => {
     const out = withErrorMarker(base, 600, 400, "/?regen=abc");
     expect(out).toContain("/?regen=abc");
     expect(out).toContain("<!-- regenerate at:");
+  });
+
+  it("小さい画像ではコンパクト版マーカーを使う", () => {
+    const out = withErrorMarker(base, 100, 60, "/?regen=x");
+    expect(out).toContain('class="ic-warn"');
+    // chip 版の "エディタで再生成" は出ない
+    expect(out).not.toContain("エディタで再生成");
   });
 
   it("元のSVGの </svg> を保持", () => {

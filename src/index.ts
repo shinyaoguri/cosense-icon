@@ -294,7 +294,7 @@ async function handleIcon(
       return response;
     }
     const baseSvg = renderSvg(parsed.text, parsed.options);
-    const regen = buildRegenUrl(url.pathname);
+    const regen = url.origin + buildRegenUrl(url.pathname);
     const svg = withErrorMarker(
       baseSvg,
       parsed.options.width,
