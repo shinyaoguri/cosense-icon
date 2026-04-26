@@ -41,6 +41,8 @@ const KEY_ALIASES: Record<string, string> = {
   spacing: "ls",
   align: "align",
   "text-align": "align",
+  rotate: "rotate",
+  rot: "rotate",
 };
 
 function applySingleOpt(k: string, v: string): void {
@@ -83,6 +85,13 @@ function applySingleOpt(k: string, v: string): void {
     case "align":
       $select("align").value = v;
       return;
+    case "rotate": {
+      const n = ((Number(v) % 360) + 360) % 360;
+      if (n === 0 || n === 90 || n === 180 || n === 270) {
+        $input("rotate").value = String(n);
+      }
+      return;
+    }
     case "font": {
       const low = v.toLowerCase();
       if ((BUILTIN_FONTS as readonly string[]).includes(low)) {

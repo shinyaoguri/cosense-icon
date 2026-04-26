@@ -20,6 +20,7 @@ const baseOpts: IconOptions = {
   radius: 0,
   lineHeight: 1.2,
   align: "center",
+  rotate: 0,
 };
 
 // 2026-04-19 JST 12:00 = UTC 2026-04-19 03:00

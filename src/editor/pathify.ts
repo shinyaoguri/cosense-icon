@@ -112,6 +112,20 @@ export async function fetchFontBuffer(
   return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
 }
 
+function rotationWrap(
+  width: number,
+  height: number,
+  rotate: number,
+): { outerW: number; outerH: number; transform: string | null } {
+  if (rotate === 90)
+    return { outerW: height, outerH: width, transform: `translate(${height} 0) rotate(90)` };
+  if (rotate === 180)
+    return { outerW: width, outerH: height, transform: `translate(${width} ${height}) rotate(180)` };
+  if (rotate === 270)
+    return { outerW: height, outerH: width, transform: `translate(0 ${width}) rotate(270)` };
+  return { outerW: width, outerH: height, transform: null };
+}
+
 export function buildSvgFromFont(
   font: OpenTypeFont,
   lines: string[],
@@ -155,10 +169,13 @@ export function buildSvgFromFont(
     .map(d => `<path d="${d}" fill="${xmlEscape(fg)}"/>`)
     .join("\n");
 
+  const inner = `${bgShape}\n${pathEls}`;
+  const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
+  const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-${bgShape}
-${pathEls}
+<svg xmlns="http://www.w3.org/2000/svg" width="${outerW}" height="${outerH}" viewBox="0 0 ${outerW} ${outerH}">
+${body}
 </svg>`;
 }
 

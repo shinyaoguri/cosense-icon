@@ -11,6 +11,7 @@ export type IconOptions = {
   lineHeight: number;
   letterSpacing?: number;
   align: "left" | "center" | "right" | "justify";
+  rotate: 0 | 90 | 180 | 270;
   timezone?: string;
 };
 
@@ -62,6 +63,9 @@ const KEY_ALIASES: Record<string, keyof IconOptions> = {
   spacing: "letterSpacing",
   align: "align",
   "text-align": "align",
+  rotate: "rotate",
+  rot: "rotate",
+  "回転": "rotate",
   tz: "timezone",
   timezone: "timezone",
   "タイムゾーン": "timezone",
@@ -119,6 +123,7 @@ const DEFAULTS: IconOptions = {
   radius: 0,
   lineHeight: 1.2,
   align: "center",
+  rotate: 0,
 };
 
 const KV_SEPARATORS = /[-=:]/;
@@ -226,6 +231,14 @@ function applyOption(
       if (a) {
         opts.align = a;
         explicit.add("align");
+      }
+      return;
+    }
+    case "rotate": {
+      const n = ((Number(rawValue) % 360) + 360) % 360;
+      if (n === 0 || n === 90 || n === 180 || n === 270) {
+        opts.rotate = n as 0 | 90 | 180 | 270;
+        explicit.add("rotate");
       }
       return;
     }

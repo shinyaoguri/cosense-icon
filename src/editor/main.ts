@@ -66,12 +66,21 @@ function update(): void {
   $input("markdown").value = "![icon](" + full + ")";
   const w = +$input("w").value;
   const h = +$input("h").value;
-  applyPreviewSize(w, h);
+  const rot = (Number($input("rotate").value) || 0) % 360;
+  applyPreviewSize(w, h, rot);
   applyPreviewPadding(+$input("padding").value);
   applyPreviewRadius(+$input("radius").value);
   const readout = document.getElementById("sizeReadout");
-  if (readout) readout.textContent = `${w} × ${h} px`;
+  if (readout) {
+    const swap = rot === 90 || rot === 270;
+    const ow = swap ? h : w;
+    const oh = swap ? w : h;
+    readout.textContent = `${ow} × ${oh} px`;
+  }
+  const rotLabel = document.getElementById("rotateLabel");
+  if (rotLabel) rotLabel.textContent = `${rot}°`;
   syncAlignSegmented();
+  syncWeightSegmented();
   updateContrast();
   updateRegisterUI();
 
@@ -96,9 +105,8 @@ function linkSliderNumber(sliderId: string, numberId: string): void {
     update();
   });
 }
-(["size", "lh", "ls"] as const).forEach(k =>
-  linkSliderNumber(k + "Range", k),
-);
+// sizeRange は hidden だが値の保持用に残してあるため同期させる
+linkSliderNumber("sizeRange", "size");
 
 function syncColor(pair: "bg" | "fg"): void {
   const c = $input(pair);
@@ -123,6 +131,46 @@ $input("sizeAuto").addEventListener("change", () => {
   $input("sizeRange").disabled = auto;
   update();
 });
+
+// 字サイズ A-/A+ ボタン: ±4px ステップで自動を解除しつつ調整
+const SIZE_STEP = 4;
+function stepSize(delta: number): void {
+  const sizeInp = $input("size");
+  const cur = +sizeInp.value || 16;
+  const next = Math.max(4, Math.min(800, cur + delta));
+  sizeInp.value = String(next);
+  $input("sizeRange").value = String(next);
+  $input("sizeAuto").checked = false;
+  sizeInp.disabled = false;
+  $input("sizeRange").disabled = false;
+  update();
+}
+$("sizeDown").addEventListener("click", () => stepSize(-SIZE_STEP));
+$("sizeUp").addEventListener("click", () => stepSize(SIZE_STEP));
+
+// 太さ segmented control
+function syncWeightSegmented(): void {
+  const v = $select("weight").value;
+  document
+    .querySelectorAll<HTMLButtonElement>("#weightSeg .weight-seg")
+    .forEach(btn => {
+      const active = btn.dataset["value"] === v;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-checked", String(active));
+    });
+}
+document
+  .querySelectorAll<HTMLButtonElement>("#weightSeg .weight-seg")
+  .forEach(btn => {
+    btn.addEventListener("click", () => {
+      const v = btn.dataset["value"];
+      if (!v) return;
+      $select("weight").value = v;
+      syncWeightSegmented();
+      update();
+    });
+  });
+syncWeightSegmented();
 
 // 揃え segmented control
 function syncAlignSegmented(): void {
@@ -174,6 +222,14 @@ $("randomFont").addEventListener("click", () => {
   spinDice("randomFont");
   const f = randomFont($textarea("text").value, currentFontValue());
   applyFont(f, update);
+});
+
+$("rotateBtn").addEventListener("click", () => {
+  const inp = $input("rotate");
+  const cur = (Number(inp.value) || 0) % 360;
+  const next = (cur + 90) % 360;
+  inp.value = String(next);
+  update();
 });
 
 document

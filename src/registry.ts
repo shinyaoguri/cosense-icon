@@ -23,6 +23,7 @@ function normalizedKeyParts(parsed: ParsedPath): string {
     `lh=${o.lineHeight}`,
     `ls=${o.letterSpacing ?? 0}`,
     `align=${o.align}`,
+    `rotate=${o.rotate ?? 0}`,
   ].join("|");
 }
 

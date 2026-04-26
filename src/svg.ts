@@ -29,6 +29,21 @@ function estimateFontSize(
   return Math.max(8, Math.min(maxByWidth, maxByHeight));
 }
 
+// 回転後の外殻寸法と内部 g に当てる transform を計算
+export function rotationWrap(
+  width: number,
+  height: number,
+  rotate: number,
+): { outerW: number; outerH: number; transform: string | null } {
+  if (rotate === 90)
+    return { outerW: height, outerH: width, transform: `translate(${height} 0) rotate(90)` };
+  if (rotate === 180)
+    return { outerW: width, outerH: height, transform: `translate(${width} ${height}) rotate(180)` };
+  if (rotate === 270)
+    return { outerW: height, outerH: width, transform: `translate(0 ${width}) rotate(270)` };
+  return { outerW: width, outerH: height, transform: null };
+}
+
 export function renderSvg(lines: string[], opts: IconOptions): string {
   const { width, height, bg, fg, padding, radius, fontFamily, fontWeight, align } = opts;
   const innerW = Math.max(1, width - padding * 2);
@@ -75,9 +90,13 @@ export function renderSvg(lines: string[], opts: IconOptions): string {
       ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${escapeXml(bg)}"/>`
       : `<rect width="${width}" height="${height}" fill="${escapeXml(bg)}"/>`;
 
+  const inner = `${bgShape}
+<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}>${tspans}</text>`;
+  const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
+  const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-${bgShape}
-<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}>${tspans}</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="${outerW}" height="${outerH}" viewBox="0 0 ${outerW} ${outerH}">
+${body}
 </svg>`;
 }

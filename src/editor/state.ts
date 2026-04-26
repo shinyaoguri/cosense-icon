@@ -12,6 +12,7 @@ export interface Defaults {
   lh: number;
   ls: number;
   font: string;
+  rotate: number;
 }
 
 export const defaults: Defaults = {
@@ -26,6 +27,7 @@ export const defaults: Defaults = {
   lh: 1.2,
   ls: 0,
   font: "sans",
+  rotate: 0,
 };
 
 export interface InitialValues extends Defaults {
@@ -51,6 +53,7 @@ export const initial: InitialValues = {
   lh: 1.2,
   ls: 0,
   font: "sans",
+  rotate: 0,
   fontCustom: "",
 };
 
@@ -62,11 +65,13 @@ export interface IconOpts {
   lh: number;
   bg: string;
   fg: string;
-  align: "left" | "center" | "right";
+  align: "left" | "center" | "right" | "justify";
   size: number | null;
+  rotate: 0 | 90 | 180 | 270;
 }
 
 export function collectIconOpts(): IconOpts {
+  const r = (+$input("rotate").value || 0) as IconOpts["rotate"];
   return {
     width: +$input("w").value,
     height: +$input("h").value,
@@ -77,6 +82,7 @@ export function collectIconOpts(): IconOpts {
     fg: $input("fg").value,
     align: $select("align").value as IconOpts["align"],
     size: $input("sizeAuto").checked ? null : +$input("size").value,
+    rotate: r,
   };
 }
 
@@ -109,6 +115,8 @@ export function build(): string {
   if (lh !== defaults.lh) opts.push("lh-" + lh);
   const ls = Number($input("ls").value);
   if (ls !== defaults.ls) opts.push("ls-" + ls);
+  const rotate = Number($input("rotate").value);
+  if (rotate !== defaults.rotate) opts.push("rotate-" + rotate);
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {

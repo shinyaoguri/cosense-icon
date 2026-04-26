@@ -5,12 +5,16 @@ const W_MAX = 4000;
 const H_MIN = 1;
 const H_MAX = 4000;
 
-export function applyPreviewSize(w: number, h: number): void {
+export function applyPreviewSize(w: number, h: number, rotate = 0): void {
   const frame = document.getElementById("previewFrame");
   if (!frame) return;
-  frame.style.width = w + "px";
-  frame.style.height = h + "px";
-  frame.style.aspectRatio = `${w} / ${h}`;
+  // 90/270 度回転時は外殻が縦横入れ替え
+  const swap = rotate === 90 || rotate === 270;
+  const outerW = swap ? h : w;
+  const outerH = swap ? w : h;
+  frame.style.width = outerW + "px";
+  frame.style.height = outerH + "px";
+  frame.style.aspectRatio = `${outerW} / ${outerH}`;
 }
 
 // サイズハンドル(角)と十分離して常に押せるようにする最小オフセット
@@ -71,20 +75,26 @@ function setupHandle(id: string, dir: Direction, onUpdate: () => void): void {
     const rect = frame!.getBoundingClientRect();
     const startW = +$input("w").value;
     const startH = +$input("h").value;
-    // ドラッグ開始時のスケールで以後の dx/dy を論理 px に換算
-    const scaleX = startW > 0 ? rect.width / startW : 1;
-    const scaleY = startH > 0 ? rect.height / startH : 1;
+    // 回転時はユーザーから見た「幅」「高さ」が元の w/h と入れ替わる
+    const rot = (Number($input("rotate").value) || 0) % 360;
+    const swap = rot === 90 || rot === 270;
+    const xField = swap ? "h" : "w";
+    const yField = swap ? "w" : "h";
+    const startXField = swap ? startH : startW;
+    const startYField = swap ? startW : startH;
+    const scaleX = startXField > 0 ? rect.width / startXField : 1;
+    const scaleY = startYField > 0 ? rect.height / startYField : 1;
     const startX = e.clientX;
     const startY = e.clientY;
 
     const onMove = (ev: PointerEvent): void => {
       if (dir.x !== undefined) {
         const dx = ((ev.clientX - startX) / scaleX) * dir.x;
-        setNum("w", clamp(Math.round(startW + dx), W_MIN, W_MAX));
+        setNum(xField, clamp(Math.round(startXField + dx), W_MIN, W_MAX));
       }
       if (dir.y !== undefined) {
         const dy = ((ev.clientY - startY) / scaleY) * dir.y;
-        setNum("h", clamp(Math.round(startH + dy), H_MIN, H_MAX));
+        setNum(yField, clamp(Math.round(startYField + dy), H_MIN, H_MAX));
       }
       onUpdate();
     };
@@ -117,8 +127,12 @@ function setupPaddingHandle(id: string, onUpdate: () => void): void {
     const startPad = +$input("padding").value;
     const startW = +$input("w").value;
     const startH = +$input("h").value;
-    const scaleX = startW > 0 ? rect.width / startW : 1;
-    const scaleY = startH > 0 ? rect.height / startH : 1;
+    const rot = (Number($input("rotate").value) || 0) % 360;
+    const swap = rot === 90 || rot === 270;
+    const outerW = swap ? startH : startW;
+    const outerH = swap ? startW : startH;
+    const scaleX = outerW > 0 ? rect.width / outerW : 1;
+    const scaleY = outerH > 0 ? rect.height / outerH : 1;
     const startX = e.clientX;
     const startY = e.clientY;
     // 余白を増やしすぎて画像領域が消えないよう、min(w,h)/2 - 1 を上限
@@ -163,8 +177,12 @@ function setupRadiusHandle(id: string, onUpdate: () => void): void {
     const startR = +$input("radius").value;
     const startW = +$input("w").value;
     const startH = +$input("h").value;
-    const scaleX = startW > 0 ? rect.width / startW : 1;
-    const scaleY = startH > 0 ? rect.height / startH : 1;
+    const rot = (Number($input("rotate").value) || 0) % 360;
+    const swap = rot === 90 || rot === 270;
+    const outerW = swap ? startH : startW;
+    const outerH = swap ? startW : startH;
+    const scaleX = outerW > 0 ? rect.width / outerW : 1;
+    const scaleY = outerH > 0 ? rect.height / outerH : 1;
     const startX = e.clientX;
     const startY = e.clientY;
     const maxR = Math.floor(Math.min(startW, startH) / 2);

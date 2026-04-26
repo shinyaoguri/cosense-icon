@@ -1,5 +1,5 @@
 import type { IconOptions } from "./parser";
-import { escapeXml } from "./svg";
+import { escapeXml, rotationWrap } from "./svg";
 
 export const DEFAULT_TZ = "Asia/Tokyo";
 
@@ -91,18 +91,28 @@ function dayOfYear(year: number, month1: number, day: number): number {
   return Math.round((target - start) / 86_400_000) + 1;
 }
 
-function svgOpen(w: number, h: number, bg: string, radius: number): string {
+// 動的キーワード SVG: bgRect を含む内側 body を rotate でラップして外殻 svg を作る
+function wrapDynamicSvg(
+  innerBody: string,
+  w: number,
+  h: number,
+  bg: string,
+  radius: number,
+  rotate: number,
+): string {
   const bgFill = escapeXml(bg);
   const bgRect =
     radius > 0
       ? `<rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="${bgFill}"/>`
       : `<rect width="${w}" height="${h}" fill="${bgFill}"/>`;
+  const inner = `${bgRect}\n${innerBody}`;
+  const { outerW, outerH, transform } = rotationWrap(w, h, rotate);
+  const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-${bgRect}`;
+<svg xmlns="http://www.w3.org/2000/svg" width="${outerW}" height="${outerH}" viewBox="0 0 ${outerW} ${outerH}">
+${body}
+</svg>`;
 }
-
-const SVG_CLOSE = "\n</svg>";
 
 export function renderTodaySvg(
   now: Date,
@@ -140,8 +150,7 @@ export function renderTodaySvg(
     `<text x="${x}" y="${subBaseline}" fill="${fg}" font-family="${font}" font-size="${subSize}" text-anchor="middle" opacity="0.65">${escapeXml(wd)}</text>`,
   ].join("\n");
 
-  return `${svgOpen(opts.width, opts.height, opts.bg, opts.radius)}
-${body}${SVG_CLOSE}`;
+  return wrapDynamicSvg(body, opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
 }
 
 export function renderWeekSvg(
@@ -211,8 +220,7 @@ export function renderWeekSvg(
     );
   });
 
-  return `${svgOpen(opts.width, opts.height, opts.bg, opts.radius)}
-${body.join("\n")}${SVG_CLOSE}`;
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
 }
 
 export function renderMonthSvg(
@@ -303,8 +311,7 @@ export function renderMonthSvg(
     );
   });
 
-  return `${svgOpen(opts.width, opts.height, opts.bg, opts.radius)}
-${body.join("\n")}${SVG_CLOSE}`;
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
 }
 
 export function renderYearSvg(
@@ -367,8 +374,7 @@ export function renderYearSvg(
     }
   }
 
-  return `${svgOpen(opts.width, opts.height, opts.bg, opts.radius)}
-${body.join("\n")}${SVG_CLOSE}`;
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
 }
 
 export function renderDynamicSvg(
