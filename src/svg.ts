@@ -85,13 +85,49 @@ export function renderSvg(lines: string[], opts: IconOptions): string {
       ? ` letter-spacing="${opts.letterSpacing}"`
       : "";
 
+  // 背景: gradient or 単色
+  const useGrad = !!opts.gradTo;
+  let gradDef = "";
+  let bgFillVal = bg;
+  if (useGrad) {
+    const angle = (opts.gradAngle * Math.PI) / 180;
+    // 0deg = 上→下, 90deg = 左→右 のような定義 (CSS と合わせる)
+    const dx = Math.sin(angle);
+    const dy = -Math.cos(angle);
+    const x1 = (0.5 - dx / 2) * 100;
+    const y1 = (0.5 - dy / 2) * 100;
+    const x2 = (0.5 + dx / 2) * 100;
+    const y2 = (0.5 + dy / 2) * 100;
+    gradDef = `<linearGradient id="bgGrad" x1="${x1.toFixed(2)}%" y1="${y1.toFixed(2)}%" x2="${x2.toFixed(2)}%" y2="${y2.toFixed(2)}%"><stop offset="0%" stop-color="${escapeXml(bg)}"/><stop offset="100%" stop-color="${escapeXml(opts.gradTo!)}"/></linearGradient>`;
+    bgFillVal = "url(#bgGrad)";
+  }
   const bgShape =
     radius > 0
-      ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${escapeXml(bg)}"/>`
-      : `<rect width="${width}" height="${height}" fill="${escapeXml(bg)}"/>`;
+      ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${useGrad ? bgFillVal : escapeXml(bg)}"/>`
+      : `<rect width="${width}" height="${height}" fill="${useGrad ? bgFillVal : escapeXml(bg)}"/>`;
 
-  const inner = `${bgShape}
-<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}>${tspans}</text>`;
+  // 影フィルタ
+  const useShadow = opts.shadow === "on";
+  const shadowColor = opts.shadowColor ?? "rgba(0,0,0,0.45)";
+  const shadowBlur = opts.shadowBlur;
+  const defParts: string[] = [];
+  if (useShadow) {
+    defParts.push(
+      `<filter id="ds" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="${Math.max(1, shadowBlur / 2)}" stdDeviation="${shadowBlur}" flood-color="${escapeXml(shadowColor)}"/></filter>`,
+    );
+  }
+  if (gradDef) defParts.push(gradDef);
+  const filterDef = defParts.length > 0 ? `<defs>${defParts.join("")}</defs>` : "";
+  const filterAttr = useShadow ? ` filter="url(#ds)"` : "";
+
+  // ストローク (paint-order=stroke でテキストの外側に縁取り)
+  const strokeAttrs =
+    opts.stroke && opts.strokeWidth > 0
+      ? ` stroke="${escapeXml(opts.stroke)}" stroke-width="${opts.strokeWidth}" stroke-linejoin="round" paint-order="stroke fill"`
+      : "";
+
+  const inner = `${filterDef}${bgShape}
+<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}${strokeAttrs}${filterAttr}>${tspans}</text>`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
 

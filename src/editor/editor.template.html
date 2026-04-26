@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cosense-icon editor</title>
+<meta name="description" content="Cosense ページアイコンを URL から動的に生成するエディタ。テキストと色を URL に埋め込むだけで SVG アイコンが作れる。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="cosense-icon editor">
+<meta property="og:description" content="テキストと色を URL に埋め込むだけで SVG アイコンが作れるエディタ。">
+<meta property="og:image" content="__OG_IMAGE__">
+<meta property="og:url" content="__OG_URL__">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="cosense-icon editor">
+<meta name="twitter:image" content="__OG_IMAGE__">
+<link rel="icon" type="image/svg+xml" href="/cosense-icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -78,20 +88,32 @@ body {
 /* header */
 header {
   flex: none;
-  padding: 0.85rem 2rem;
+  padding: 0.65rem 1.5rem 0.65rem 2rem;
   border-bottom: 1px solid var(--border);
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.header-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  overflow: hidden;
 }
 header h1 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.015em;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  flex: none;
 }
 header h1::before {
   content: '';
@@ -102,14 +124,300 @@ header h1::before {
   box-shadow: 0 0 12px var(--accent);
 }
 header p {
-  display: inline;
-  margin: 0 0 0 0.9rem;
+  margin: 0;
   color: var(--text-faint);
   font-size: 0.76rem;
   font-weight: 400;
   letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-header h1, header p { vertical-align: middle; }
+.header-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.header-actions-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+.header-download-group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+.header-download-group .download-btn {
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.header-download-group .download-btn:last-child { border-right: 0; }
+.header-download-group .download-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.header-download-group .download-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-faint);
+}
+.header-ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all var(--transition);
+}
+.header-ghost-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.header-ghost-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--error-soft);
+}
+.header-ghost-btn:active { transform: translateY(1px); }
+.header-ghost-btn.flash {
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-soft);
+}
+.header-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+}
+.header-ghost-btn.header-fav-btn:hover,
+.header-ghost-btn.header-fav-btn[aria-expanded="true"] {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.header-badge {
+  background: var(--warn);
+  color: #1a1207;
+  font-size: 0.66rem;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 0.1rem 0.4rem;
+  min-width: 1.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.header-badge[hidden] { display: none; }
+
+/* お気に入り右ペイン */
+.fav-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 0;
+  max-height: 100%;
+  padding: 1rem 1.1rem;
+  overflow: hidden;
+}
+.fav-pane[hidden] { display: none; }
+.fav-pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.fav-pane-head h2 {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+.fav-pane-close {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-faint);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  transition: all var(--transition);
+  flex: none;
+}
+.fav-pane-close:hover {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.fav-save-btn {
+  flex: none;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition: all var(--transition);
+}
+.fav-save-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.fav-save-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+}
+.fav-save-btn.saved {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.fav-save-btn.saved svg { fill: var(--warn); }
+.fav-save-btn.saved:hover {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--error-soft);
+}
+.fav-save-btn.saved:hover svg { fill: var(--error); stroke: var(--error); }
+.fav-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.fav-list::-webkit-scrollbar { width: 8px; }
+.fav-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+  border: 2px solid var(--surface);
+}
+.fav-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.45rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--text-muted);
+}
+.fav-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.fav-card .thumb {
+  flex: none;
+  width: 56px;
+  height: 40px;
+  background:
+    linear-gradient(45deg, rgba(39, 49, 73, 0.4) 25%, transparent 25%) 0 0/8px 8px,
+    linear-gradient(-45deg, rgba(39, 49, 73, 0.4) 25%, transparent 25%) 0 0/8px 8px,
+    var(--bg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fav-card .thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+.fav-card .label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.fav-card.current {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+.fav-card .del {
+  flex: none;
+  background: transparent;
+  border: 0;
+  color: var(--text-faint);
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  font: inherit;
+  transition: all var(--transition);
+  opacity: 0.6;
+}
+.fav-card .del:hover {
+  background: var(--error-soft);
+  color: var(--error);
+  opacity: 1;
+}
+.fav-empty {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  padding: 2.5rem 0.5rem;
+  line-height: 1.7;
+}
 
 /* main */
 main {
@@ -123,13 +431,54 @@ main {
   width: 100%;
   margin: 0 auto;
   overflow: hidden;
+  transition: grid-template-columns var(--transition);
+}
+main.fav-open {
+  grid-template-columns: minmax(320px, 380px) 1fr 280px;
+  max-width: 1640px;
+}
+@media (max-width: 1180px) {
+  main.fav-open { grid-template-columns: minmax(300px, 360px) 1fr 250px; }
 }
 @media (max-width: 820px) {
   html, body { height: auto; overflow: visible; }
   body { display: block; }
   main { grid-template-columns: 1fr; padding: 1rem; gap: 1rem; overflow: visible; }
+  main.fav-open { grid-template-columns: 1fr; }
   form.panel { max-height: none; overflow: visible; }
   .preview-wrap { overflow: visible; }
+  .fav-pane { max-height: none; overflow: visible; }
+  .fav-list { max-height: 50vh; }
+  /* モバイル: タッチターゲット拡大 */
+  .resize-handle { width: 16px; height: 16px; }
+  .handle-tl { top: -9px; left: -9px; }
+  .handle-tr { top: -9px; right: -9px; }
+  .handle-bl { bottom: -9px; left: -9px; }
+  .handle-br { bottom: -9px; right: -9px; }
+  .handle-t { top: -9px; margin-left: -8px; }
+  .handle-b { bottom: -9px; margin-left: -8px; }
+  .handle-l { left: -9px; margin-top: -8px; }
+  .handle-r { right: -9px; margin-top: -8px; }
+  .padding-handle, .radius-handle { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+  .padding-handle { margin: 0 -7px -7px 0; }
+  /* モバイルでもハンドルは常時 visible (hover 不要) */
+  .preview-frame::before,
+  .resize-handle, .padding-handle, .radius-handle { opacity: 0.7; }
+  .resize-handle.dragging, .padding-handle.dragging, .radius-handle.dragging { opacity: 1; }
+  /* フォームのフォントを少し大きくしてタップしやすく */
+  .field input[type=number] { width: auto; flex: 1; min-width: 4rem; }
+  .url-row button { padding: 0.55rem 1rem; min-height: 36px; }
+  .preset-btn { min-height: 32px; }
+  .size-step-btn, .weight-seg, .align-seg, .fill-mode-seg { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  /* ヘッダーダウンロード: モバイルでは横並びで折り返さない */
+  header { flex-wrap: wrap; padding: 0.6rem 1rem; gap: 0.7rem; }
+  .header-title { flex-basis: 100%; }
+  .header-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .header-actions-label { display: none; }
+  .header-divider { display: none; }
+  .header-download-group .download-btn { padding: 0.5rem 0.7rem; min-height: 36px; }
+  .header-ghost-btn { padding: 0.5rem 0.7rem; min-height: 36px; }
+  .header-ghost-btn span { display: none; }
 }
 
 /* panel */
@@ -174,8 +523,174 @@ form.panel::-webkit-scrollbar-thumb {
   justify-content: space-between;
   align-items: center;
   margin: 0 0 0.8rem;
+  gap: 0.5rem;
 }
 .row-head h2 { margin: 0; }
+.row-head-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+
+/* Keynote 風セクションプレート */
+.fill-section,
+.effect-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem 0.85rem 0.8rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.fill-section .field,
+.effect-section .field { margin-bottom: 0; }
+.fill-section .color-fields { gap: 0.4rem; }
+
+/* fill-body: 単色時は縦、グラデ時は左右2列 (Keynote 風) */
+.fill-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.fill-stops {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.fill-section[data-fill="gradient"] .fill-body {
+  flex-direction: row;
+  gap: 0.85rem;
+  align-items: center;
+  animation: fillGradReveal var(--transition) ease-out;
+}
+.fill-section[data-fill="gradient"] .fill-stops { flex: 1; }
+.fill-section[data-fill="solid"] .grad-only { display: none; }
+@keyframes fillGradReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* グラデ角度ダイヤル (Keynote 風) */
+.grad-angle-wrap {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.grad-dial {
+  width: 78px;
+  height: 78px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: grab;
+  touch-action: none;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.grad-dial:hover { transform: scale(1.04); }
+.grad-dial.dragging,
+.grad-dial:active { cursor: grabbing; transform: scale(1.02); }
+.grad-dial svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.grad-dial:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.grad-dial #gradAngleNeedle {
+  transition: transform 80ms linear;
+  transform-origin: 0 0;
+}
+.grad-dial.dragging #gradAngleNeedle {
+  transition: none;
+}
+.grad-angle-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.grad-angle-num input[type=number] {
+  width: 3.6rem;
+  text-align: center;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.28rem 0.4rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.grad-angle-num input[type=number]:hover { border-color: var(--border-strong); }
+.grad-angle-num input[type=number]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.grad-angle-num .unit {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 塗り種類 segmented control (Keynote 風) */
+.fill-mode-segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elev);
+  overflow: hidden;
+  flex: 1;
+}
+.fill-mode-seg {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  line-height: 1;
+  transition: background var(--transition), color var(--transition);
+}
+.fill-mode-seg:last-child { border-right: 0; }
+.fill-mode-seg svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  color: currentColor;
+}
+.fill-mode-seg:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.fill-mode-seg.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.fill-mode-seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* field */
 .field {
@@ -229,6 +744,11 @@ form.panel::-webkit-scrollbar-thumb {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* ハンドルドラッグ中に該当 input をハイライト */
+.field input.dragging {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-ring);
 }
 .field input:disabled { opacity: 0.45; cursor: not-allowed; }
 .field input[type=color] {
@@ -776,6 +1296,199 @@ input[type=range]::-moz-range-thumb {
   transform: translateY(0);
 }
 
+/* テキスト入力ラッパ: 絵文字トリガをコーナーに重ねるため relative */
+.text-input-wrap {
+  position: relative;
+  width: 100%;
+  display: block;
+}
+.text-input-wrap textarea {
+  width: 100%;
+  display: block;
+  /* 右下に絵文字ボタンを配置するため余白を確保 */
+  padding-right: 3.2rem;
+  padding-bottom: 2.4rem;
+}
+
+/* 絵文字トリガ: テキストボックス右下に重ねる小さいアイコンボタン */
+.emoji-trigger {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 1.1rem; /* 右下のリサイズグリップを避ける */
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: all var(--transition-fast);
+  font: inherit;
+  z-index: 2;
+}
+.emoji-trigger .emoji-trigger-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+  filter: grayscale(0.05);
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+.text-input-wrap:hover .emoji-trigger,
+.emoji-trigger:focus-visible {
+  opacity: 1;
+  border-color: var(--border);
+}
+.emoji-trigger:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.emoji-trigger[aria-expanded="true"] {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* 絵文字パネル: フローティング・ポップオーバー (form の overflow を抜けるため fixed) */
+.emoji-panel {
+  position: fixed;
+  width: min(360px, calc(100vw - 16px));
+  max-width: 360px;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: emojiPopIn 140ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.emoji-panel[hidden] { display: none; }
+@keyframes emojiPopIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.emoji-search {
+  flex: none;
+  padding: 0.5rem 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.emoji-search input {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.32rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.emoji-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.emoji-tabs {
+  flex: none;
+  display: flex;
+  gap: 0.05rem;
+  padding: 0.3rem 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.emoji-tabs::-webkit-scrollbar { display: none; }
+.emoji-tab {
+  flex: none;
+  background: transparent;
+  border: 0;
+  padding: 0.32rem 0.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.emoji-tab:hover { background: var(--surface-hover); }
+.emoji-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-soft);
+}
+.emoji-grid-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.emoji-grid-scroll::-webkit-scrollbar { width: 8px; }
+.emoji-grid-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+  border: 2px solid var(--bg-elev);
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 0.05rem;
+  padding: 0.4rem 0.5rem 0.5rem;
+}
+.emoji-cat-header {
+  grid-column: 1 / -1;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: 0.45rem 0.1rem 0.2rem;
+}
+.emoji-cat-header:first-child { padding-top: 0.1rem; }
+.emoji-grid button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.15rem;
+  padding: 0.2rem 0;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+.emoji-grid button:hover {
+  background: var(--surface-hover);
+  transform: scale(1.15);
+}
+.emoji-empty {
+  grid-column: 1 / -1;
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+
+/* 影 / 縁取り行: チェックが入っていない時は色・数値を控えめに */
+.decor-field input[type=color],
+.decor-field input[type=number] {
+  transition: opacity var(--transition);
+}
+.decor-field:has(input[type=checkbox]:not(:checked)) input[type=color],
+.decor-field:has(input[type=checkbox]:not(:checked)) input[type=number] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 /* 字サイズ A-/A+ ボタン (Word 風 - 連結された stepper) */
 .size-stepper {
   display: inline-flex;
@@ -1189,50 +1902,116 @@ footer a:hover { color: var(--accent); }
 </head>
 <body>
 <header>
-  <h1>Cosense Icon Generator</h1>
-  <p>テキストと色を URL に埋め込むだけでアイコンを生成する</p>
+  <div class="header-title">
+    <h1>Cosense Icon Generator</h1>
+    <p>テキストと色を URL に埋め込むだけでアイコンを生成する</p>
+  </div>
+  <div class="header-actions">
+    <button type="button" id="favBtn" class="header-ghost-btn header-fav-btn" title="お気に入りペインを開閉" aria-label="お気に入り" aria-expanded="false" aria-controls="favPane">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 9 22 10 17 15 18 22 12 18 6 22 7 15 2 10 9 9 12 2"/></svg>
+      <span>お気に入り</span>
+      <span class="header-badge" id="favCount" hidden>0</span>
+    </button>
+    <button type="button" id="resetBtn" class="header-ghost-btn" title="初期状態に戻す (⌘Z で取り消し可)" aria-label="リセット">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>
+      <span>リセット</span>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <span class="header-actions-label">ダウンロード</span>
+    <div class="header-download-group">
+      <button type="button" class="download-btn" data-download="svg">SVG</button>
+      <button type="button" class="download-btn" data-download="png" data-scale="1">PNG</button>
+      <button type="button" class="download-btn" data-download="png" data-scale="2">@2x</button>
+      <button type="button" class="download-btn" data-download="png" data-scale="3">@3x</button>
+    </div>
+  </div>
 </header>
 <main>
   <form class="panel" id="form" autocomplete="off">
-    <h2>テキスト</h2>
+    <h2 style="margin-top:0;">テキスト</h2>
     <div class="stack">
-      <textarea id="text" placeholder="Type... / 入力..."></textarea>
+      <div class="text-input-wrap">
+        <textarea id="text" placeholder="Type... / 入力..."></textarea>
+        <button type="button" id="emojiBtn" class="emoji-trigger" title="絵文字を挿入" aria-label="絵文字を挿入" aria-expanded="false">
+          <span class="emoji-trigger-icon" aria-hidden="true">😀</span>
+        </button>
+      </div>
+    </div>
+    <div id="emojiPanel" class="emoji-panel" hidden role="dialog" aria-label="絵文字を選択">
+      <div class="emoji-search">
+        <input type="search" id="emojiSearch" placeholder="検索 (例: heart, 笑顔)" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="emoji-tabs" id="emojiTabs" role="tablist" aria-label="カテゴリ"></div>
+      <div class="emoji-grid-scroll">
+        <div id="emojiGrid" class="emoji-grid"></div>
+      </div>
     </div>
 
     <div class="row-head">
-      <h2 style="margin:0;">配色</h2>
-      <div class="contrast-label" id="contrastLabel" hidden></div>
+      <h2 style="margin:0;">塗り</h2>
+      <div class="row-head-tools">
+        <div class="contrast-label" id="contrastLabel" hidden></div>
+        <button type="button" id="random" class="preset-btn random-btn" title="ランダムな配色 (WCAG AA)" aria-label="ランダムな配色">
+          <svg class="dice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg>
+        </button>
+      </div>
     </div>
-    <div class="color-fields">
-      <span class="color-label">背景</span>
-      <input type="color" id="bg" value="#1e40af" title="背景色">
-      <input type="text" id="bgHex" value="#1e40af" title="背景色">
-      <button type="button" id="random" class="preset-btn random-btn" title="ランダムな配色 (WCAG AA)" aria-label="ランダムな配色">
-        <svg class="dice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none"/></svg>
-      </button>
-      <span class="color-label">文字</span>
-      <input type="color" id="fg" value="#ffffff" title="文字色">
-      <input type="text" id="fgHex" value="#ffffff" title="文字色">
-    </div>
-
-    <h2>サイズ</h2>
-    <div class="row size-row">
-      <div class="field"><label>幅</label>
-        <input type="number" id="w" value="600" min="1" max="4000"></div>
-      <div class="field"><label>高さ</label>
-        <input type="number" id="h" value="400" min="1" max="4000"></div>
-      <div class="field"><label>余白</label>
-        <input type="number" id="padding" value="24" min="0" max="500"></div>
-      <div class="field"><label>角丸</label>
-        <input type="number" id="radius" value="0" min="0" max="500"></div>
-    </div>
-    <div class="field">
-      <label>回転</label>
-      <button type="button" id="rotateBtn" class="rotate-btn" title="90° ずつ回転" aria-label="90° ずつ回転">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 10 15 10"/></svg>
-        <span id="rotateLabel">0°</span>
-      </button>
-      <input type="hidden" id="rotate" value="0">
+    <div class="fill-section" id="fillSection" data-fill="solid">
+      <div class="field">
+        <label>種類</label>
+        <div class="fill-mode-segmented" id="fillModeSeg" role="radiogroup" aria-label="塗りの種類">
+          <button type="button" class="fill-mode-seg" data-value="solid" role="radio" aria-checked="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" fill="currentColor"/></svg>
+            単色
+          </button>
+          <button type="button" class="fill-mode-seg" data-value="gradient" role="radio" aria-checked="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="fmGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.9"/><stop offset="100%" stop-color="currentColor" stop-opacity="0.15"/></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="3" fill="url(#fmGrad)"/></svg>
+            グラデ
+          </button>
+        </div>
+      </div>
+      <div class="fill-body">
+        <div class="fill-stops">
+          <div class="color-fields">
+            <span class="color-label" id="bgColorLabel">背景</span>
+            <input type="color" id="bg" value="#ffffff" title="背景色">
+            <input type="text" id="bgHex" value="#ffffff" title="背景色">
+          </div>
+          <div class="color-fields grad-only">
+            <span class="color-label">終了</span>
+            <input type="color" id="gradColor" value="#7c3aed" title="グラデーション終点">
+            <input type="text" id="gradColorHex" value="#7c3aed" title="グラデーション終点">
+          </div>
+        </div>
+        <div class="grad-angle-wrap grad-only">
+          <button type="button" id="gradAngleDial" class="grad-dial" role="slider" tabindex="0" aria-label="グラデーションの角度" aria-valuemin="0" aria-valuemax="360" aria-valuenow="135" title="ドラッグまたは矢印キーで角度を変更">
+            <svg viewBox="-50 -50 100 100" aria-hidden="true">
+              <circle cx="0" cy="0" r="38" fill="rgba(8,12,24,0.55)" stroke="var(--border-strong)" stroke-width="1"/>
+              <g stroke="var(--text-faint)" stroke-width="1.4" stroke-linecap="round" opacity="0.75">
+                <line x1="0" y1="-38" x2="0" y2="-32"/>
+                <line x1="38" y1="0" x2="32" y2="0"/>
+                <line x1="0" y1="38" x2="0" y2="32"/>
+                <line x1="-38" y1="0" x2="-32" y2="0"/>
+              </g>
+              <g id="gradAngleNeedle" transform="rotate(135)">
+                <line x1="0" y1="0" x2="0" y2="-30" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/>
+                <circle cx="0" cy="-30" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1"/>
+              </g>
+              <circle cx="0" cy="0" r="2.4" fill="var(--text-muted)"/>
+            </svg>
+          </button>
+          <div class="grad-angle-num">
+            <input type="number" id="gradAngle" value="135" min="0" max="360" step="15">
+            <span class="unit">°</span>
+          </div>
+        </div>
+      </div>
+      <div class="color-fields">
+        <span class="color-label">文字</span>
+        <input type="color" id="fg" value="#000000" title="文字色">
+        <input type="text" id="fgHex" value="#000000" title="文字色">
+      </div>
+      <input type="checkbox" id="grad" hidden>
     </div>
 
     <h2>文字</h2>
@@ -1322,7 +2101,43 @@ footer a:hover { color: var(--accent); }
       </div>
     </div>
 
-    <p class="help">未変更の項目はURLに含まれない。テキスト中の改行はURL上 <code>\n</code> に変換される。</p>
+    <h2>サイズ</h2>
+    <div class="row size-row">
+      <div class="field"><label>幅</label>
+        <input type="number" id="w" value="600" min="1" max="4000"></div>
+      <div class="field"><label>高さ</label>
+        <input type="number" id="h" value="400" min="1" max="4000"></div>
+      <div class="field"><label>余白</label>
+        <input type="number" id="padding" value="24" min="0" max="500"></div>
+      <div class="field"><label>角丸</label>
+        <input type="number" id="radius" value="0" min="0" max="500"></div>
+    </div>
+    <div class="field">
+      <label>回転</label>
+      <button type="button" id="rotateBtn" class="rotate-btn" title="90° ずつ回転" aria-label="90° ずつ回転">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 10 15 10"/></svg>
+        <span id="rotateLabel">0°</span>
+      </button>
+      <input type="hidden" id="rotate" value="0">
+    </div>
+
+    <h2>効果</h2>
+    <div class="effect-section">
+      <div class="field decor-field">
+        <label>影</label>
+        <input type="checkbox" id="shadow">
+        <input type="color" id="shadowColor" value="#000000" title="影の色">
+        <span class="unit">ぼかし</span>
+        <input type="number" id="shadowBlur" value="4" min="0" max="40" step="1">
+      </div>
+      <div class="field decor-field">
+        <label>縁取り</label>
+        <input type="checkbox" id="stroke">
+        <input type="color" id="strokeColor" value="#000000" title="縁取りの色">
+        <span class="unit">幅</span>
+        <input type="number" id="strokeWidth" value="2" min="0" max="40" step="0.5">
+      </div>
+    </div>
   </form>
 
   <div class="preview-wrap">
@@ -1363,6 +2178,18 @@ footer a:hover { color: var(--accent); }
       <p class="help" id="copyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
     </div>
   </div>
+
+  <aside class="panel fav-pane" id="favPane" hidden aria-label="お気に入り一覧">
+    <div class="fav-pane-head">
+      <h2>お気に入り</h2>
+      <button type="button" id="favPaneClose" class="fav-pane-close" title="ペインを閉じる" aria-label="ペインを閉じる">×</button>
+    </div>
+    <button type="button" id="favSaveBtn" class="fav-save-btn" title="現在の状態をお気に入りに追加">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 9 22 10 17 15 18 22 12 18 6 22 7 15 2 10 9 9 12 2"/></svg>
+      <span id="favSaveLabel">現在の状態を保存</span>
+    </button>
+    <div class="fav-list" id="favList"></div>
+  </aside>
 </main>
 <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
   <div class="auth-modal-card">

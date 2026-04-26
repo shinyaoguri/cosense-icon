@@ -87,6 +87,12 @@ function setupHandle(id: string, dir: Direction, onUpdate: () => void): void {
     const startX = e.clientX;
     const startY = e.clientY;
 
+    // ドラッグ中は該当する input をハイライト
+    const flashIds: string[] = [];
+    if (dir.x !== undefined) flashIds.push(xField);
+    if (dir.y !== undefined) flashIds.push(yField);
+    flashIds.forEach(fid => $input(fid).classList.add("dragging"));
+
     const onMove = (ev: PointerEvent): void => {
       if (dir.x !== undefined) {
         const dx = ((ev.clientX - startX) / scaleX) * dir.x;
@@ -104,6 +110,7 @@ function setupHandle(id: string, dir: Direction, onUpdate: () => void): void {
       handle.removeEventListener("pointercancel", onUp);
       handle.classList.remove("dragging");
       frame?.classList.remove("dragging");
+      flashIds.forEach(fid => $input(fid).classList.remove("dragging"));
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);
@@ -122,6 +129,7 @@ function setupPaddingHandle(id: string, onUpdate: () => void): void {
     handle.classList.add("dragging");
     const frame = document.getElementById("previewFrame");
     frame?.classList.add("dragging");
+    $input("padding").classList.add("dragging");
 
     const rect = frame!.getBoundingClientRect();
     const startPad = +$input("padding").value;
@@ -154,6 +162,7 @@ function setupPaddingHandle(id: string, onUpdate: () => void): void {
       handle.removeEventListener("pointercancel", onUp);
       handle.classList.remove("dragging");
       frame?.classList.remove("dragging");
+      $input("padding").classList.remove("dragging");
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);
@@ -172,6 +181,7 @@ function setupRadiusHandle(id: string, onUpdate: () => void): void {
     handle.classList.add("dragging");
     const frame = document.getElementById("previewFrame");
     frame?.classList.add("dragging");
+    $input("radius").classList.add("dragging");
 
     const rect = frame!.getBoundingClientRect();
     const startR = +$input("radius").value;
@@ -203,6 +213,7 @@ function setupRadiusHandle(id: string, onUpdate: () => void): void {
       handle.removeEventListener("pointercancel", onUp);
       handle.classList.remove("dragging");
       frame?.classList.remove("dragging");
+      $input("radius").classList.remove("dragging");
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);

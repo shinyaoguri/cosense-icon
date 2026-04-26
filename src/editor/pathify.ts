@@ -162,14 +162,45 @@ export function buildSvgFromFont(
     return font.getPath(line, x, y, fontSize).toPathData(2);
   });
 
+  // 背景: gradient or 単色
+  const useGrad = !!opts.gradTo;
+  let gradDef = "";
+  let bgFillVal = xmlEscape(bg);
+  if (useGrad) {
+    const angle = ((opts.gradAngle ?? 135) * Math.PI) / 180;
+    const dx = Math.sin(angle);
+    const dy = -Math.cos(angle);
+    const x1 = (0.5 - dx / 2) * 100;
+    const y1 = (0.5 - dy / 2) * 100;
+    const x2 = (0.5 + dx / 2) * 100;
+    const y2 = (0.5 + dy / 2) * 100;
+    gradDef = `<linearGradient id="bgGrad" x1="${x1.toFixed(2)}%" y1="${y1.toFixed(2)}%" x2="${x2.toFixed(2)}%" y2="${y2.toFixed(2)}%"><stop offset="0%" stop-color="${xmlEscape(bg)}"/><stop offset="100%" stop-color="${xmlEscape(opts.gradTo!)}"/></linearGradient>`;
+    bgFillVal = "url(#bgGrad)";
+  }
   const bgShape = radius > 0
-    ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${xmlEscape(bg)}"/>`
-    : `<rect width="${width}" height="${height}" fill="${xmlEscape(bg)}"/>`;
+    ? `<rect width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${bgFillVal}"/>`
+    : `<rect width="${width}" height="${height}" fill="${bgFillVal}"/>`;
+  const useShadow = opts.shadow === "on";
+  const shadowColor = opts.shadowColor ?? "rgba(0,0,0,0.45)";
+  const shadowBlur = opts.shadowBlur ?? 4;
+  const defParts: string[] = [];
+  if (useShadow) {
+    defParts.push(
+      `<filter id="ds" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="${Math.max(1, shadowBlur / 2)}" stdDeviation="${shadowBlur}" flood-color="${xmlEscape(shadowColor)}"/></filter>`,
+    );
+  }
+  if (gradDef) defParts.push(gradDef);
+  const filterDef = defParts.length > 0 ? `<defs>${defParts.join("")}</defs>` : "";
+  const filterAttr = useShadow ? ` filter="url(#ds)"` : "";
+  const strokeAttrs =
+    opts.stroke && (opts.strokeWidth ?? 0) > 0
+      ? ` stroke="${xmlEscape(opts.stroke)}" stroke-width="${opts.strokeWidth}" stroke-linejoin="round" paint-order="stroke fill"`
+      : "";
   const pathEls = pathDatas
-    .map(d => `<path d="${d}" fill="${xmlEscape(fg)}"/>`)
+    .map(d => `<path d="${d}" fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}/>`)
     .join("\n");
 
-  const inner = `${bgShape}\n${pathEls}`;
+  const inner = `${filterDef}${bgShape}\n${pathEls}`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
 

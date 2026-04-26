@@ -17,7 +17,7 @@ export interface Defaults {
 
 export const defaults: Defaults = {
   bg: "#ffffff",
-  fg: "#222222",
+  fg: "#000000",
   w: 600,
   h: 400,
   weight: "700",
@@ -40,20 +40,8 @@ export interface InitialValues extends Defaults {
 export const initial: InitialValues = {
   ...defaults,
   text: "",
-  bg: "#1e40af",
-  fg: "#ffffff",
-  w: 600,
-  h: 400,
-  padding: 24,
-  radius: 0,
   sizeAuto: true,
   size: 160,
-  weight: "700",
-  align: "center",
-  lh: 1.2,
-  ls: 0,
-  font: "sans",
-  rotate: 0,
   fontCustom: "",
 };
 
@@ -68,10 +56,19 @@ export interface IconOpts {
   align: "left" | "center" | "right" | "justify";
   size: number | null;
   rotate: 0 | 90 | 180 | 270;
+  shadow?: string;
+  shadowBlur?: number;
+  shadowColor?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  gradTo?: string;
+  gradAngle?: number;
 }
 
 export function collectIconOpts(): IconOpts {
   const r = (+$input("rotate").value || 0) as IconOpts["rotate"];
+  const shadowOn = $input("shadow").checked;
+  const strokeOn = $input("stroke").checked;
   return {
     width: +$input("w").value,
     height: +$input("h").value,
@@ -83,6 +80,13 @@ export function collectIconOpts(): IconOpts {
     align: $select("align").value as IconOpts["align"],
     size: $input("sizeAuto").checked ? null : +$input("size").value,
     rotate: r,
+    shadow: shadowOn ? "on" : undefined,
+    shadowBlur: +$input("shadowBlur").value || 4,
+    shadowColor: $input("shadowColor").value,
+    stroke: strokeOn ? $input("strokeColor").value : undefined,
+    strokeWidth: +$input("strokeWidth").value || 0,
+    gradTo: $input("grad").checked ? $input("gradColor").value : undefined,
+    gradAngle: +$input("gradAngle").value || 135,
   };
 }
 
@@ -117,6 +121,28 @@ export function build(): string {
   if (ls !== defaults.ls) opts.push("ls-" + ls);
   const rotate = Number($input("rotate").value);
   if (rotate !== defaults.rotate) opts.push("rotate-" + rotate);
+
+  if ($input("shadow").checked) {
+    const sc = $input("shadowColor").value;
+    if (sc) opts.push("shadow-" + sc.replace("#", ""));
+    else opts.push("shadow-on");
+    const sb = +$input("shadowBlur").value || 4;
+    if (sb !== 4) opts.push("blur-" + sb);
+  }
+  if ($input("stroke").checked) {
+    const stColor = $input("strokeColor").value;
+    const sw = +$input("strokeWidth").value || 0;
+    if (stColor && sw > 0) {
+      opts.push("stroke-" + stColor.replace("#", ""));
+      opts.push("stroke-w-" + sw);
+    }
+  }
+  if ($input("grad").checked) {
+    const gc = $input("gradColor").value;
+    if (gc) opts.push("grad-" + gc.replace("#", ""));
+    const ga = +$input("gradAngle").value || 135;
+    if (ga !== 135) opts.push("angle-" + ga);
+  }
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {

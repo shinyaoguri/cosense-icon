@@ -99,13 +99,26 @@ function wrapDynamicSvg(
   bg: string,
   radius: number,
   rotate: number,
+  opts?: { gradTo?: string; gradAngle?: number },
 ): string {
-  const bgFill = escapeXml(bg);
+  let gradDef = "";
+  let bgFillVal = escapeXml(bg);
+  if (opts?.gradTo) {
+    const angle = ((opts.gradAngle ?? 135) * Math.PI) / 180;
+    const dx = Math.sin(angle);
+    const dy = -Math.cos(angle);
+    const x1 = (0.5 - dx / 2) * 100;
+    const y1 = (0.5 - dy / 2) * 100;
+    const x2 = (0.5 + dx / 2) * 100;
+    const y2 = (0.5 + dy / 2) * 100;
+    gradDef = `<defs><linearGradient id="bgGrad" x1="${x1.toFixed(2)}%" y1="${y1.toFixed(2)}%" x2="${x2.toFixed(2)}%" y2="${y2.toFixed(2)}%"><stop offset="0%" stop-color="${escapeXml(bg)}"/><stop offset="100%" stop-color="${escapeXml(opts.gradTo)}"/></linearGradient></defs>`;
+    bgFillVal = "url(#bgGrad)";
+  }
   const bgRect =
     radius > 0
-      ? `<rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="${bgFill}"/>`
-      : `<rect width="${w}" height="${h}" fill="${bgFill}"/>`;
-  const inner = `${bgRect}\n${innerBody}`;
+      ? `<rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="${bgFillVal}"/>`
+      : `<rect width="${w}" height="${h}" fill="${bgFillVal}"/>`;
+  const inner = `${gradDef}${bgRect}\n${innerBody}`;
   const { outerW, outerH, transform } = rotationWrap(w, h, rotate);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -150,7 +163,7 @@ export function renderTodaySvg(
     `<text x="${x}" y="${subBaseline}" fill="${fg}" font-family="${font}" font-size="${subSize}" text-anchor="middle" opacity="0.65">${escapeXml(wd)}</text>`,
   ].join("\n");
 
-  return wrapDynamicSvg(body, opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
+  return wrapDynamicSvg(body, opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
 }
 
 export function renderWeekSvg(
@@ -220,7 +233,7 @@ export function renderWeekSvg(
     );
   });
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
 }
 
 export function renderMonthSvg(
@@ -311,7 +324,7 @@ export function renderMonthSvg(
     );
   });
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
 }
 
 export function renderYearSvg(
@@ -374,7 +387,7 @@ export function renderYearSvg(
     }
   }
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0);
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
 }
 
 export function renderDynamicSvg(

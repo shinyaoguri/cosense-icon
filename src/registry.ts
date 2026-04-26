@@ -24,6 +24,9 @@ function normalizedKeyParts(parsed: ParsedPath): string {
     `ls=${o.letterSpacing ?? 0}`,
     `align=${o.align}`,
     `rotate=${o.rotate ?? 0}`,
+    `shadow=${o.shadow ?? ""}-${o.shadowColor ?? ""}-${o.shadowBlur ?? 0}`,
+    `stroke=${o.stroke ?? ""}-${o.strokeWidth ?? 0}`,
+    `grad=${o.gradTo ?? ""}-${o.gradAngle ?? 135}`,
   ].join("|");
 }
 

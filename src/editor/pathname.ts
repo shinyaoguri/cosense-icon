@@ -43,6 +43,18 @@ const KEY_ALIASES: Record<string, string> = {
   "text-align": "align",
   rotate: "rotate",
   rot: "rotate",
+  shadow: "shadow",
+  blur: "shadowBlur",
+  "shadow-blur": "shadowBlur",
+  stroke: "stroke",
+  outline: "stroke",
+  "stroke-w": "strokeWidth",
+  "stroke-width": "strokeWidth",
+  grad: "grad",
+  "grad-to": "grad",
+  to: "grad",
+  angle: "gradAngle",
+  "grad-angle": "gradAngle",
 };
 
 function applySingleOpt(k: string, v: string): void {
@@ -90,6 +102,55 @@ function applySingleOpt(k: string, v: string): void {
       if (n === 0 || n === 90 || n === 180 || n === 270) {
         $input("rotate").value = String(n);
       }
+      return;
+    }
+    case "shadow": {
+      const lower = v.toLowerCase();
+      const off = !lower || lower === "off" || lower === "none" || lower === "0";
+      $input("shadow").checked = !off;
+      const hex = /^#?[0-9a-fA-F]{3,8}$/.test(v)
+        ? v.startsWith("#") ? v : "#" + v
+        : "";
+      if (hex) $input("shadowColor").value = hex;
+      return;
+    }
+    case "shadowBlur": {
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) $input("shadowBlur").value = String(n);
+      return;
+    }
+    case "stroke": {
+      const lower = v.toLowerCase();
+      const off = !lower || lower === "off" || lower === "none" || lower === "0";
+      $input("stroke").checked = !off;
+      const hex = /^#?[0-9a-fA-F]{3,8}$/.test(v)
+        ? v.startsWith("#") ? v : "#" + v
+        : "";
+      if (hex) $input("strokeColor").value = hex;
+      return;
+    }
+    case "strokeWidth": {
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) $input("strokeWidth").value = String(n);
+      return;
+    }
+    case "grad": {
+      const lower = v.toLowerCase();
+      const off = !lower || lower === "off" || lower === "none" || lower === "0";
+      $input("grad").checked = !off;
+      const hex = /^#?[0-9a-fA-F]{3,8}$/.test(v)
+        ? v.startsWith("#") ? v : "#" + v
+        : "";
+      if (hex) {
+        $input("gradColor").value = hex;
+        const ghx = document.getElementById("gradColorHex") as HTMLInputElement | null;
+        if (ghx) ghx.value = hex;
+      }
+      return;
+    }
+    case "gradAngle": {
+      const n = Number(v);
+      if (Number.isFinite(n)) $input("gradAngle").value = String(n);
       return;
     }
     case "font": {

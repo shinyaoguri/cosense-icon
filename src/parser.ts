@@ -12,6 +12,13 @@ export type IconOptions = {
   letterSpacing?: number;
   align: "left" | "center" | "right" | "justify";
   rotate: 0 | 90 | 180 | 270;
+  shadow?: string; // 例: "4-rgba(0,0,0,.4)" → blur4 + 色 (簡略)
+  shadowBlur: number;
+  shadowColor?: string;
+  stroke?: string; // 文字色とは別の縁取り色
+  strokeWidth: number;
+  gradTo?: string; // 設定されていればグラデ背景 (bg → gradTo)
+  gradAngle: number; // 角度 (deg)。デフォ 135
   timezone?: string;
 };
 
@@ -66,6 +73,21 @@ const KEY_ALIASES: Record<string, keyof IconOptions> = {
   rotate: "rotate",
   rot: "rotate",
   "回転": "rotate",
+  shadow: "shadow",
+  "影": "shadow",
+  "shadow-blur": "shadowBlur",
+  "blur": "shadowBlur",
+  "shadow-color": "shadowColor",
+  stroke: "stroke",
+  "縁": "stroke",
+  outline: "stroke",
+  "stroke-w": "strokeWidth",
+  "stroke-width": "strokeWidth",
+  "grad": "gradTo",
+  "grad-to": "gradTo",
+  "to": "gradTo",
+  "grad-angle": "gradAngle",
+  "angle": "gradAngle",
   tz: "timezone",
   timezone: "timezone",
   "タイムゾーン": "timezone",
@@ -113,7 +135,7 @@ const TZ_SHORTCUTS: Record<string, string> = {
 
 const DEFAULTS: IconOptions = {
   bg: "#ffffff",
-  fg: "#222222",
+  fg: "#000000",
   width: 600,
   height: 400,
   fontFamily:
@@ -124,6 +146,9 @@ const DEFAULTS: IconOptions = {
   lineHeight: 1.2,
   align: "center",
   rotate: 0,
+  shadowBlur: 4,
+  strokeWidth: 0,
+  gradAngle: 135,
 };
 
 const KV_SEPARATORS = /[-=:]/;
@@ -239,6 +264,73 @@ function applyOption(
       if (n === 0 || n === 90 || n === 180 || n === 270) {
         opts.rotate = n as 0 | 90 | 180 | 270;
         explicit.add("rotate");
+      }
+      return;
+    }
+    case "shadow": {
+      const v = rawValue.trim().toLowerCase();
+      // "off"/"none" は無効化
+      if (!v || v === "off" || v === "none" || v === "0") return;
+      // 値 = ON フラグ。色は shadow-color で別指定可。値自体を色とみなす場合も許可
+      if (v === "on" || v === "1" || v === "true") {
+        opts.shadow = "on";
+      } else {
+        const c = parseColor(rawValue);
+        if (c) {
+          opts.shadow = "on";
+          opts.shadowColor = c;
+        }
+      }
+      explicit.add("shadow");
+      return;
+    }
+    case "shadowBlur": {
+      const n = Number(rawValue);
+      if (Number.isFinite(n) && n >= 0) {
+        opts.shadowBlur = n;
+        explicit.add("shadowBlur");
+      }
+      return;
+    }
+    case "shadowColor": {
+      const c = parseColor(rawValue);
+      if (c) {
+        opts.shadowColor = c;
+        explicit.add("shadowColor");
+      }
+      return;
+    }
+    case "stroke": {
+      const v = rawValue.trim().toLowerCase();
+      if (!v || v === "off" || v === "none" || v === "0") return;
+      const c = parseColor(rawValue);
+      if (c) {
+        opts.stroke = c;
+        explicit.add("stroke");
+      }
+      return;
+    }
+    case "strokeWidth": {
+      const n = Number(rawValue);
+      if (Number.isFinite(n) && n >= 0) {
+        opts.strokeWidth = n;
+        explicit.add("strokeWidth");
+      }
+      return;
+    }
+    case "gradTo": {
+      const c = parseColor(rawValue);
+      if (c) {
+        opts.gradTo = c;
+        explicit.add("gradTo");
+      }
+      return;
+    }
+    case "gradAngle": {
+      const n = Number(rawValue);
+      if (Number.isFinite(n)) {
+        opts.gradAngle = ((n % 360) + 360) % 360;
+        explicit.add("gradAngle");
       }
       return;
     }

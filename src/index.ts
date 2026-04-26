@@ -86,6 +86,37 @@ async function handleFontCss(url: URL): Promise<Response> {
   });
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderEditorHtml(url: URL): string {
+  // 拡張子なしパスならその状態の SVG を OGP 画像に
+  // それ以外（"/"）はトップページ用デフォルト画像
+  const trimmed = url.pathname.replace(/^\/+/, "");
+  const hasState = trimmed.length > 0;
+  const ogPath = hasState
+    ? "/" + trimmed.replace(/\/$/, "") + ".svg"
+    : "/cosense-icon.svg";
+  const ogImage = url.origin + ogPath;
+  const ogUrl = url.origin + url.pathname;
+  return editorHtml
+    .replace(/__OG_IMAGE__/g, escapeHtml(ogImage))
+    .replace(/__OG_URL__/g, escapeHtml(ogUrl));
+}
+
+// favicon / OGP 用デフォルト画像 (cosense-icon ロゴ風)
+const FAVICON_SVG = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<rect width="600" height="600" rx="120" fill="#1e40af"/>
+<text x="300" y="380" fill="#ffffff" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="280" text-anchor="middle">ic</text>
+</svg>`;
+
 function applyRandomPalette(parsed: ParsedPath): void {
   if (!parsed.random) return;
   const palette = deterministicPalette(parsed.text.join("\n"));
@@ -227,7 +258,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/" || url.pathname === "") {
-      return new Response(editorHtml, {
+      return new Response(renderEditorHtml(url), {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "public, max-age=300",
@@ -249,8 +280,13 @@ export default {
       return handleFontCss(url);
     }
 
-    if (url.pathname === "/favicon.ico") {
-      return new Response(null, { status: 204 });
+    if (url.pathname === "/favicon.ico" || url.pathname === "/cosense-icon.svg") {
+      return new Response(FAVICON_SVG, {
+        headers: {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=86400",
+        },
+      });
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -260,6 +296,17 @@ export default {
     const parsed = parsePath(url.pathname);
     if (!parsed) {
       return new Response("Not Found", { status: 404 });
+    }
+
+    // 拡張子 .svg が無い場合はエディタを返す (URL = ステート の対応関係)
+    const isSvgRequest = url.pathname.toLowerCase().endsWith(".svg");
+    if (!isSvgRequest) {
+      return new Response(renderEditorHtml(url), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=300",
+        },
+      });
     }
 
     return handleIcon(url, parsed, env, request, ctx);

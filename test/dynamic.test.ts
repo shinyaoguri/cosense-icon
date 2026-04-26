@@ -21,6 +21,9 @@ const baseOpts: IconOptions = {
   lineHeight: 1.2,
   align: "center",
   rotate: 0,
+  shadowBlur: 4,
+  strokeWidth: 0,
+  gradAngle: 135,
 };
 
 // 2026-04-19 JST 12:00 = UTC 2026-04-19 03:00
