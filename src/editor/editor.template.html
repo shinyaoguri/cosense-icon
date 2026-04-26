@@ -14,6 +14,12 @@
 <meta name="twitter:title" content="cosense-icon editor">
 <meta name="twitter:image" content="__OG_IMAGE__">
 <link rel="icon" type="image/svg+xml" href="/cosense-icon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#060a14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cosense Icon">
+<link rel="apple-touch-icon" href="/cosense-icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -96,6 +102,9 @@ header {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  /* シェアメニュー等のドロップダウンを <main> より前面に出すため */
+  position: relative;
+  z-index: 100;
 }
 .header-title {
   flex: 1;
@@ -139,44 +148,158 @@ header p {
   align-items: center;
   gap: 0.55rem;
 }
-.header-actions-label {
-  font-size: 0.66rem;
+/* シェアドロップダウン */
+.share-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.share-btn .caret {
+  font-size: 0.6em;
+  opacity: 0.55;
+  transition: transform var(--transition);
+  margin-left: 0.05rem;
+}
+.share-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+.share-btn[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.share-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  padding: 0.3rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  animation: shareMenuPop 140ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  transform-origin: top right;
+}
+.share-menu[hidden] { display: none; }
+@keyframes shareMenuPop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.share-section-label {
+  font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-faint);
   font-weight: 600;
+  padding: 0.4rem 0.6rem 0.2rem;
 }
-.header-download-group {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elev);
-  overflow: hidden;
-}
-.header-download-group .download-btn {
-  border: 0;
-  border-right: 1px solid var(--border);
-  border-radius: 0;
-  padding: 0.4rem 0.75rem;
+.share-section-label:first-child { padding-top: 0.2rem; }
+.share-item {
   background: transparent;
+  border: 0;
   color: var(--text-muted);
+  text-align: left;
+  padding: 0.45rem 0.65rem;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.header-download-group .download-btn:last-child { border-right: 0; }
-.header-download-group .download-btn:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
+.share-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
-.header-download-group .download-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.share-item.copied {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.share-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.share-item svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  opacity: 0.7;
+}
+.share-item .muted {
   color: var(--text-faint);
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+}
+.share-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.3rem 0.2rem;
+}
+
+/* お気に入りトグル: パネルアイコンで「右ペイン開閉」を明示 */
+.header-fav-toggle {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all var(--transition);
+  position: relative;
+}
+.header-fav-toggle svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.header-fav-toggle .pane-fill,
+.header-fav-toggle .fav-star {
+  transition: fill-opacity var(--transition);
+}
+.header-fav-toggle:hover {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.header-fav-toggle[aria-expanded="true"] {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn);
+}
+.header-fav-toggle[aria-expanded="true"] .pane-fill {
+  fill-opacity: 0.35;
+}
+.header-fav-toggle[aria-expanded="true"]::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  background: var(--surface);
+  border-right: 1px solid var(--warn);
+  border-bottom: 1px solid var(--warn);
+  transform: rotate(45deg);
+}
+.header-fav-toggle:focus-visible {
+  outline: 2px solid var(--warn);
+  outline-offset: 2px;
+}
+.header-fav-label {
+  font-weight: 500;
 }
 .header-ghost-btn {
   background: transparent;
@@ -213,12 +336,6 @@ header p {
   width: 1px;
   height: 22px;
   background: var(--border);
-}
-.header-ghost-btn.header-fav-btn:hover,
-.header-ghost-btn.header-fav-btn[aria-expanded="true"] {
-  border-color: var(--warn);
-  color: var(--warn);
-  background: var(--warn-soft);
 }
 .header-badge {
   background: var(--warn);
@@ -470,15 +587,18 @@ main.fav-open {
   .url-row button { padding: 0.55rem 1rem; min-height: 36px; }
   .preset-btn { min-height: 32px; }
   .size-step-btn, .weight-seg, .align-seg, .fill-mode-seg { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-  /* ヘッダーダウンロード: モバイルでは横並びで折り返さない */
+  /* ヘッダー: モバイルでは折り返してアクションを下段に */
   header { flex-wrap: wrap; padding: 0.6rem 1rem; gap: 0.7rem; }
   .header-title { flex-basis: 100%; }
   .header-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
-  .header-actions-label { display: none; }
   .header-divider { display: none; }
-  .header-download-group .download-btn { padding: 0.5rem 0.7rem; min-height: 36px; }
-  .header-ghost-btn { padding: 0.5rem 0.7rem; min-height: 36px; }
-  .header-ghost-btn span { display: none; }
+  .header-ghost-btn,
+  .header-fav-toggle,
+  .share-btn { padding: 0.5rem 0.7rem; min-height: 36px; }
+  .header-ghost-btn span:not(.header-badge),
+  .header-fav-label { display: none; }
+  .share-btn span:not(.caret) { display: none; }
+  .share-menu { right: 0; max-width: calc(100vw - 24px); }
 }
 
 /* panel */
@@ -1797,6 +1917,102 @@ footer a {
 }
 footer a:hover { color: var(--accent); }
 
+/* トースト通知 (画面上部中央) */
+.toast {
+  position: fixed;
+  top: 1.1rem;
+  left: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 1rem;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.83rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(560px, calc(100vw - 2rem));
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -14px);
+  transition: opacity var(--transition), transform var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.toast .toast-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast .toast-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  position: relative;
+}
+.toast.toast-info {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.toast.toast-info .toast-icon {
+  background: var(--accent);
+  color: #07101f;
+}
+.toast.toast-info .toast-icon::before {
+  content: 'i';
+  font-style: italic;
+  font-family: 'Times New Roman', serif;
+  font-size: 0.8rem;
+}
+.toast.toast-success {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: linear-gradient(0deg, var(--success-soft), var(--success-soft)), var(--surface);
+}
+.toast.toast-success .toast-icon {
+  background: var(--success);
+  color: #07101f;
+}
+.toast.toast-success .toast-icon::before { content: '✓'; font-size: 0.85rem; }
+.toast.toast-error {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: linear-gradient(0deg, var(--error-soft), var(--error-soft)), var(--surface);
+}
+.toast.toast-error .toast-icon {
+  background: var(--error);
+  color: #fff;
+}
+.toast.toast-error .toast-icon::before { content: '!'; }
+.toast.toast-progress {
+  border-color: var(--border-strong);
+}
+.toast.toast-progress .toast-icon {
+  background: transparent;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-top-color: var(--accent);
+  animation: toastSpin 700ms linear infinite;
+}
+.toast.toast-progress .toast-icon::before { content: ''; }
+@keyframes toastSpin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 540px) {
+  .toast { white-space: normal; max-width: calc(100vw - 1rem); }
+}
+
 /* 認証モーダル */
 .auth-modal {
   position: fixed;
@@ -1907,23 +2123,61 @@ footer a:hover { color: var(--accent); }
     <p>テキストと色を URL に埋め込むだけでアイコンを生成する</p>
   </div>
   <div class="header-actions">
-    <button type="button" id="favBtn" class="header-ghost-btn header-fav-btn" title="お気に入りペインを開閉" aria-label="お気に入り" aria-expanded="false" aria-controls="favPane">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 9 22 10 17 15 18 22 12 18 6 22 7 15 2 10 9 9 12 2"/></svg>
-      <span>お気に入り</span>
-      <span class="header-badge" id="favCount" hidden>0</span>
-    </button>
     <button type="button" id="resetBtn" class="header-ghost-btn" title="初期状態に戻す (⌘Z で取り消し可)" aria-label="リセット">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>
       <span>リセット</span>
     </button>
-    <span class="header-divider" aria-hidden="true"></span>
-    <span class="header-actions-label">ダウンロード</span>
-    <div class="header-download-group">
-      <button type="button" class="download-btn" data-download="svg">SVG</button>
-      <button type="button" class="download-btn" data-download="png" data-scale="1">PNG</button>
-      <button type="button" class="download-btn" data-download="png" data-scale="2">@2x</button>
-      <button type="button" class="download-btn" data-download="png" data-scale="3">@3x</button>
+    <div class="share-dropdown" id="shareDropdown">
+      <button type="button" id="shareBtn" class="header-ghost-btn share-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="shareMenu" title="シェア / ダウンロード">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span>シェア</span>
+        <span class="caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="share-menu" id="shareMenu" hidden role="menu" aria-label="シェア・ダウンロード">
+        <div class="share-section-label">URL をコピー</div>
+        <button type="button" class="share-item" data-copy="url" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          画像 URL
+        </button>
+        <button type="button" class="share-item" data-copy="cosense" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Cosense 記法
+        </button>
+        <button type="button" class="share-item" data-copy="markdown" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 16V8h2l2 3 2-3h2v8"/><polyline points="17 12 17 16"/><polyline points="15 14 17 16 19 14"/></svg>
+          Markdown
+        </button>
+        <hr class="share-divider">
+        <div class="share-section-label">ダウンロード</div>
+        <button type="button" class="share-item" data-download="svg" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          SVG
+        </button>
+        <button type="button" class="share-item" data-download="png" data-scale="1" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PNG <span class="muted">(1x)</span>
+        </button>
+        <button type="button" class="share-item" data-download="png" data-scale="2" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PNG <span class="muted">@2x</span>
+        </button>
+        <button type="button" class="share-item" data-download="png" data-scale="3" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PNG <span class="muted">@3x</span>
+        </button>
+      </div>
     </div>
+    <span class="header-divider" aria-hidden="true"></span>
+    <button type="button" id="favBtn" class="header-fav-toggle" title="お気に入りペインを開閉 / Bookmark panel" aria-label="お気に入りペインを開閉" aria-expanded="false" aria-controls="favPane">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path class="pane-fill" d="M14 4 H21 V20 H14 Z" stroke="none" fill="currentColor" fill-opacity="0"/>
+        <line x1="14" y1="4" x2="14" y2="20"/>
+        <path class="fav-star" d="M17.5 9.6 l0.6 1.4 1.5 0.15 -1.1 1.05 0.3 1.5 -1.3 -0.75 -1.3 0.75 0.3 -1.5 -1.1 -1.05 1.5 -0.15 z" stroke="none" fill="currentColor" fill-opacity="0.85"/>
+      </svg>
+      <span class="header-fav-label">お気に入り</span>
+      <span class="header-badge" id="favCount" hidden>0</span>
+    </button>
   </div>
 </header>
 <main>
@@ -2175,7 +2429,6 @@ footer a:hover { color: var(--accent); }
         <input id="markdown" readonly>
         <button type="button" data-copy="markdown">コピー</button>
       </div>
-      <p class="help" id="copyStatus" style="margin-top:.5rem; min-height:1.2em;"></p>
     </div>
   </div>
 
@@ -2191,6 +2444,10 @@ footer a:hover { color: var(--accent); }
     <div class="fav-list" id="favList"></div>
   </aside>
 </main>
+<div id="toast" class="toast" role="status" aria-live="polite" aria-hidden="true">
+  <span class="toast-icon" aria-hidden="true"></span>
+  <span class="toast-message"></span>
+</div>
 <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
   <div class="auth-modal-card">
     <div id="authModalTitle" class="auth-modal-title">認証してください</div>

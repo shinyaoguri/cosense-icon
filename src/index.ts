@@ -117,6 +117,129 @@ const FAVICON_SVG = `<?xml version="1.0" encoding="UTF-8"?>
 <text x="300" y="380" fill="#ffffff" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="280" text-anchor="middle">ic</text>
 </svg>`;
 
+// PWA 用 maskable アイコン (角丸なし。OS 側で形にマスク)
+const FAVICON_MASKABLE_SVG = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+<rect width="600" height="600" fill="#1e40af"/>
+<text x="300" y="370" fill="#ffffff" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="240" text-anchor="middle">ic</text>
+</svg>`;
+
+const PWA_MANIFEST = JSON.stringify({
+  name: "Cosense Icon Generator",
+  short_name: "Cosense Icon",
+  description: "テキストと色を URL に埋め込むだけで SVG アイコンが作れるエディタ",
+  start_url: "/",
+  scope: "/",
+  display: "standalone",
+  orientation: "any",
+  background_color: "#060a14",
+  theme_color: "#060a14",
+  lang: "ja",
+  dir: "ltr",
+  categories: ["productivity", "design", "utilities"],
+  icons: [
+    { src: "/cosense-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+    { src: "/cosense-icon-maskable.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+  ],
+});
+
+// Service Worker (オフライン対応 + シェルキャッシュ)
+const SW_SCRIPT = `// cosense-icon Service Worker
+const CACHE = "cosense-icon-shell-v1";
+const SHELL = ["/", "/cosense-icon.svg", "/manifest.webmanifest"];
+
+self.addEventListener("install", e => {
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await Promise.all(SHELL.map(u => c.add(u).catch(() => {})));
+    self.skipWaiting();
+  })());
+});
+
+self.addEventListener("activate", e => {
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener("message", e => {
+  if (e.data === "skipWaiting") self.skipWaiting();
+});
+
+self.addEventListener("fetch", e => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  let url; try { url = new URL(req.url); } catch { return; }
+  if (url.pathname.startsWith("/api/")) return;
+
+  const accept = req.headers.get("accept") || "";
+  const isNav = req.mode === "navigate" || accept.includes("text/html");
+
+  // ナビゲーション: network-first / cache fallback
+  if (isNav && url.origin === self.location.origin) {
+    e.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        if (fresh.ok) {
+          const c = await caches.open(CACHE);
+          c.put("/", fresh.clone()).catch(() => {});
+        }
+        return fresh;
+      } catch {
+        const cached = await caches.match("/", { ignoreSearch: true });
+        return cached || new Response("オフラインです。一度オンライン状態でアクセスするとキャッシュされます。", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
+    })());
+    return;
+  }
+
+  // CDN / Google Fonts: cache-first
+  if (url.host === "fonts.googleapis.com" || url.host === "fonts.gstatic.com" || url.host === "cdn.jsdelivr.net" || url.host === "challenges.cloudflare.com") {
+    e.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      try {
+        const res = await fetch(req);
+        if (res.ok) {
+          const c = await caches.open(CACHE);
+          c.put(req, res.clone()).catch(() => {});
+        }
+        return res;
+      } catch {
+        return cached || new Response("offline", { status: 503 });
+      }
+    })());
+    return;
+  }
+
+  // 同一オリジン静的: cache-first (SVG / アイコン / manifest 等)
+  if (url.origin === self.location.origin) {
+    e.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) {
+        // バックグラウンド更新
+        fetch(req).then(res => {
+          if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())).catch(() => {});
+        }).catch(() => {});
+        return cached;
+      }
+      try {
+        const res = await fetch(req);
+        if (res.ok) {
+          const c = await caches.open(CACHE);
+          c.put(req, res.clone()).catch(() => {});
+        }
+        return res;
+      } catch {
+        return new Response("offline", { status: 503 });
+      }
+    })());
+  }
+});
+`;
+
 function applyRandomPalette(parsed: ParsedPath): void {
   if (!parsed.random) return;
   const palette = deterministicPalette(parsed.text.join("\n"));
@@ -285,6 +408,35 @@ export default {
         headers: {
           "content-type": "image/svg+xml; charset=utf-8",
           "cache-control": "public, max-age=86400",
+        },
+      });
+    }
+
+    if (url.pathname === "/cosense-icon-maskable.svg") {
+      return new Response(FAVICON_MASKABLE_SVG, {
+        headers: {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=86400",
+        },
+      });
+    }
+
+    if (url.pathname === "/manifest.webmanifest") {
+      return new Response(PWA_MANIFEST, {
+        headers: {
+          "content-type": "application/manifest+json; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+        },
+      });
+    }
+
+    if (url.pathname === "/sw.js") {
+      return new Response(SW_SCRIPT, {
+        headers: {
+          "content-type": "text/javascript; charset=utf-8",
+          // SW 自体はキャッシュさせず、最新を取得させる
+          "cache-control": "no-cache, max-age=0, must-revalidate",
+          "service-worker-allowed": "/",
         },
       });
     }

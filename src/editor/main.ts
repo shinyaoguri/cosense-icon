@@ -29,6 +29,7 @@ import {
   removeFavByPath,
   savePaneOpen,
 } from "./favorites";
+import { showToast } from "./toast";
 import { registerCurrentPath, registeredPaths } from "./register";
 import {
   build,
@@ -43,7 +44,6 @@ function updateRegisterUI(): void {
   const pending = useGF && !registered;
 
   $("fontInfoTip").classList.toggle("show", useGF);
-  if (!useGF) $("copyStatus").textContent = "";
 
   // URL 表示はまだ生成されていない状態であることを視覚的に伝える
   document
@@ -56,6 +56,11 @@ function updateRegisterUI(): void {
       // コピー直後の "コピー済" 表示中は触らない
       if (btn.classList.contains("copied")) return;
       btn.disabled = false;
+      // シェアメニュー項目はラベルが固定なので textContent を書き換えない
+      if (btn.classList.contains("share-item")) {
+        btn.classList.toggle("needs-register", pending);
+        return;
+      }
       if (pending) {
         btn.classList.add("needs-register");
         btn.textContent = "URL生成・コピー";
@@ -414,12 +419,8 @@ $("resetBtn").addEventListener("click", () => {
   const btn = $("resetBtn");
   resetForm();
   btn.classList.add("flash");
-  const status = $("copyStatus");
-  status.textContent = "リセットしました (⌘Z で取り消し)";
-  setTimeout(() => {
-    btn.classList.remove("flash");
-    if (status.textContent?.startsWith("リセットしました")) status.textContent = "";
-  }, 1500);
+  showToast("初期状態に戻しました (⌘Z で取り消し)", "info");
+  setTimeout(() => btn.classList.remove("flash"), 1500);
 });
 
 // ------- お気に入り (右ペイン) -------
@@ -532,6 +533,36 @@ $("favBtn").addEventListener("click", () => {
   setFavPaneOpen(!main?.classList.contains("fav-open"));
 });
 
+// シェアドロップダウン
+function setShareMenuOpen(open: boolean): void {
+  $("shareMenu").hidden = !open;
+  $("shareBtn").setAttribute("aria-expanded", String(open));
+}
+$("shareBtn").addEventListener("click", e => {
+  e.stopPropagation();
+  setShareMenuOpen($("shareMenu").hidden);
+});
+document.addEventListener("click", e => {
+  if ($("shareMenu").hidden) return;
+  const t = e.target as Node;
+  if ($("shareDropdown").contains(t)) return;
+  setShareMenuOpen(false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("shareMenu").hidden) {
+    setShareMenuOpen(false);
+    $("shareBtn").focus();
+  }
+});
+// メニュー項目を押したらメニュー閉じる (実処理は data-copy / data-download の既存ハンドラ)
+document
+  .querySelectorAll<HTMLElement>("#shareMenu .share-item")
+  .forEach(item => {
+    item.addEventListener("click", () => {
+      setTimeout(() => setShareMenuOpen(false), 0);
+    });
+  });
+
 $("favPaneClose").addEventListener("click", () => setFavPaneOpen(false));
 
 $("favSaveBtn").addEventListener("click", () => {
@@ -624,11 +655,11 @@ document.addEventListener("keydown", e => {
 });
 
 function showShortcutHelp(): void {
-  const status = $("copyStatus");
-  status.textContent = "R: 配色ランダム / F: フォントランダム / [ ]: 回転 / ⌘+ −: 字サイズ / ⌘Z ⌘⇧Z: Undo/Redo";
-  setTimeout(() => {
-    if (status.textContent?.startsWith("R: ")) status.textContent = "";
-  }, 5000);
+  showToast(
+    "R: 配色 / F: フォント / [ ]: 回転 / ⌘± : 字サイズ / ⌘Z ⌘⇧Z: Undo / Redo",
+    "info",
+    5000,
+  );
 }
 
 document
@@ -657,11 +688,16 @@ document
     btn.addEventListener("click", async () => {
       const kind = btn.dataset["download"];
       if (!kind) return;
-      const status = $("copyStatus");
+      const isShareItem = btn.classList.contains("share-item");
       const original = btn.textContent ?? "";
+      const scale = Number(btn.dataset["scale"] ?? "1") || 1;
+      const kindLabel =
+        kind === "svg"
+          ? "SVG"
+          : "PNG" + (scale > 1 ? ` @${scale}x` : "");
       btn.disabled = true;
-      btn.textContent = "生成中...";
-      status.textContent = "";
+      if (!isShareItem) btn.textContent = "生成中...";
+      showToast(`${kindLabel} を生成中...`, "progress");
       try {
         const svgText = await getCurrentSvgText();
         const baseName = $textarea("text").value.replace(/\r?\n/g, " ") || "icon";
@@ -674,20 +710,19 @@ document
           const swap = rot === 90 || rot === 270;
           const ow = swap ? h : w;
           const oh = swap ? w : h;
-          const scale = Number(btn.dataset["scale"] ?? "1") || 1;
           await downloadPng(svgText, ow, oh, scale, baseName);
         }
-        status.textContent = "ダウンロード完了";
-        setTimeout(() => {
-          if (status.textContent === "ダウンロード完了") status.textContent = "";
-        }, 1500);
+        showToast(`${kindLabel} をダウンロードしました`, "success");
       } catch (e) {
         console.error(e);
-        status.textContent =
-          "エラー: " + (e instanceof Error ? e.message : String(e));
+        showToast(
+          "ダウンロードに失敗しました: " +
+            (e instanceof Error ? e.message : String(e)),
+          "error",
+        );
       } finally {
         btn.disabled = false;
-        btn.textContent = original;
+        if (!isShareItem) btn.textContent = original;
       }
     });
   });
@@ -709,24 +744,44 @@ document
       const targetId = btn.dataset["copy"];
       if (!targetId) return;
       const target = document.getElementById(targetId) as HTMLInputElement;
-      const status = $("copyStatus");
       const needsRegister =
         isGoogleFont(currentFontValue()) && !registeredPaths.has(build());
+
+      const isShareItem = btn.classList.contains("share-item");
+      const itemLabels: Record<string, string> = {
+        url: "画像 URL",
+        cosense: "Cosense 記法",
+        markdown: "Markdown",
+      };
+      const itemLabel = itemLabels[targetId] ?? "テキスト";
 
       if (needsRegister) {
         btn.classList.remove("needs-register");
         btn.disabled = true;
-        btn.textContent = "登録中...";
+        if (!isShareItem) btn.textContent = "登録中...";
+        showToast("Google Fonts を登録しています...", "progress");
         try {
           await registerCurrentPath(msg => {
-            status.textContent = msg;
+            // 進捗段階に応じてより具体的な文言にする
+            const detail =
+              msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
+              : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
+              : msg.startsWith("認証") ? "Turnstile で認証中..."
+              : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."
+              : msg;
+            showToast(detail, "progress");
           });
-          status.textContent = "登録完了";
+          showToast("登録が完了しました", "success", 1200);
           setPreviewToUrl(build() + "?_=" + Date.now());
         } catch (e) {
           console.error(e);
-          status.textContent =
-            "エラー: " + (e instanceof Error ? e.message : String(e));
+          showToast(
+            "登録に失敗しました: " +
+              (e instanceof Error ? e.message : String(e)),
+            "error",
+          );
+          if (!isShareItem) btn.textContent = "コピー";
+          btn.disabled = false;
           updateRegisterUI();
           return;
         }
@@ -740,10 +795,14 @@ document
       btn.classList.remove("needs-register");
       btn.classList.add("copied");
       btn.disabled = false;
-      btn.textContent = "コピー済";
+      if (!isShareItem) btn.textContent = "コピー済";
+      // 登録直後は短く間を空けて成功 toast を上書き
+      const delay = needsRegister ? 700 : 0;
+      setTimeout(() => {
+        showToast(`${itemLabel} をクリップボードにコピーしました`, "success");
+      }, delay);
       setTimeout(() => {
         btn.classList.remove("copied");
-        if (needsRegister) status.textContent = "";
         updateRegisterUI();
       }, 1500);
     });
@@ -785,17 +844,27 @@ const STORAGE_KEY = "cosense-icon:lastPath";
     update();
     setTimeout(() => {
       if (isGoogleFont(currentFontValue())) {
+        showToast("Google Fonts を登録しています...", "progress");
         registerCurrentPath(msg => {
-          $("copyStatus").textContent = msg;
+          const detail =
+            msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
+            : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
+            : msg.startsWith("認証") ? "Turnstile で認証中..."
+            : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."
+            : msg;
+          showToast(detail, "progress");
         })
           .then(() => {
-            $("copyStatus").textContent = "登録完了";
+            showToast("登録が完了しました", "success");
             setPreviewToUrl(build() + "?_=" + Date.now());
             updateRegisterUI();
           })
           .catch(e => {
-            $("copyStatus").textContent =
-              "エラー: " + (e instanceof Error ? e.message : String(e));
+            showToast(
+              "登録に失敗しました: " +
+                (e instanceof Error ? e.message : String(e)),
+              "error",
+            );
             updateRegisterUI();
           });
       }
@@ -807,3 +876,12 @@ const STORAGE_KEY = "cosense-icon:lastPath";
 
 update();
 initHistory();
+
+// PWA: Service Worker を登録 (オフライン + ホーム画面追加対応)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/" })
+      .catch(err => console.warn("SW register failed:", err));
+  });
+}
