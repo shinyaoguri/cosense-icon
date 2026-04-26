@@ -24,8 +24,11 @@ const NO_STORE_HEADERS = {
   expires: "0",
 };
 
+// Google Fonts 未登録時のフォールバック SVG 用。
+// 登録が完了してから外部埋め込み (Cosense 等) で警告マーカーが消えるまでの
+// 最大ウインドウは max-age + stale-while-revalidate = 60 秒。
 const FALLBACK_CACHE_CONTROL =
-  "public, max-age=60, stale-while-revalidate=60";
+  "public, max-age=15, stale-while-revalidate=45";
 const IMMUTABLE_CACHE_CONTROL =
   "public, max-age=31536000, immutable";
 const SVG_CONTENT_TYPE = "image/svg+xml; charset=utf-8";
@@ -145,7 +148,7 @@ const PWA_MANIFEST = JSON.stringify({
 
 // Service Worker (オフライン対応 + シェルキャッシュ)
 const SW_SCRIPT = `// cosense-icon Service Worker
-const CACHE = "cosense-icon-shell-v1";
+const CACHE = "cosense-icon-shell-v2";
 const SHELL = ["/", "/cosense-icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", e => {
@@ -214,7 +217,35 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // 同一オリジン静的: cache-first (SVG / アイコン / manifest 等)
+  // 同一オリジン: アイコン SVG (動的生成) は network-first
+  // 未登録 → 登録の遷移時にフォールバック chip 版が SW にキャッシュされて居座らないように
+  const isGeneratedIcon =
+    url.origin === self.location.origin &&
+    url.pathname.endsWith(".svg") &&
+    url.pathname !== "/cosense-icon.svg" &&
+    url.pathname !== "/cosense-icon-maskable.svg";
+  if (isGeneratedIcon) {
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(req);
+        if (res.ok) {
+          // 1 年 immutable のものだけキャッシュ (フォールバックの短 TTL は除外)
+          const cc = res.headers.get("cache-control") || "";
+          if (cc.includes("immutable")) {
+            const c = await caches.open(CACHE);
+            c.put(req, res.clone()).catch(() => {});
+          }
+        }
+        return res;
+      } catch {
+        const cached = await caches.match(req);
+        return cached || new Response("offline", { status: 503 });
+      }
+    })());
+    return;
+  }
+
+  // 同一オリジン静的: cache-first (manifest / favicon 等)
   if (url.origin === self.location.origin) {
     e.respondWith((async () => {
       const cached = await caches.match(req);

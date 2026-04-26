@@ -5,6 +5,14 @@ export interface RegistryEnv {
   TURNSTILE_SECRET?: string;
 }
 
+// R2 キーと Cache API キーの prefix。
+// レンダリング仕様 (svg.ts / dynamic.ts) を変えて「同じオプション集合でも見た目が変わる」
+// 非互換変更を入れる場合は必ずここを bump (v1 → v2) する。
+// bump すると:
+//   - 旧キャッシュは未到達になり (新パスで lookup されるので)、自然に剥がれる
+//   - R2 の旧オブジェクトは残るが、新しい R2 キーで再登録される
+// テキスト・色・サイズなどのオプションは自動的にハッシュへ含まれるので、
+// 単にオプションを追加するだけならここの bump は不要。
 export const KEY_VERSION = "v1";
 
 function normalizedKeyParts(parsed: ParsedPath): string {

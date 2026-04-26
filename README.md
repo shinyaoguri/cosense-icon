@@ -140,11 +140,28 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 
 - 通常の SVG: `cache-control: public, max-age=31536000, immutable`。さらに Cloudflare の Cache API でエッジキャッシュに書き込み、2 回目以降のリクエストは Worker 実行を経由せず返る
 - R2 登録済みの Google Fonts SVG: 同じく immutable + Cache API
-- R2 未登録時のフォールバック: `public, max-age=60, stale-while-revalidate=60`。Cache API には書き込まない (再登録後すぐ切り替わるように)
+- R2 未登録時のフォールバック: `public, max-age=15, stale-while-revalidate=45`。Cache API には書き込まない (再登録後すぐ切り替わるように)
 - 動的キーワード: `cache-control: no-store`, `cdn-cache-control: no-store` でブラウザ・CDN・Cache API すべてを回避
 - エディタ HTML: `public, max-age=300`
 - マニフェスト: `public, max-age=3600`
 - Service Worker (`/sw.js`): `no-cache, max-age=0, must-revalidate`
+
+### Google Fonts 登録の伝播ウインドウ
+
+未登録 URL を Cosense 等で先に共有 → その後エディタで登録した場合、登録版に切り替わるまでのおおよその所要時間:
+
+| 視聴環境 | 切り替えタイミング |
+| --- | --- |
+| エディタ本人 (登録直後) | 即時 (`?_=timestamp` でキャッシュバスト) |
+| 一般ブラウザ (Cosense / Slack 等の埋め込み) | 最大 60 秒 (`max-age=15` + `SWR=45`) |
+| エディタを PWA 化したクライアント | 即時 (アイコン SVG は SW で network-first) |
+| Discord 等の独自画像プロキシ | 不定 (相手側の TTL に依存。日単位のことも) |
+
+未登録時は `<text>` フォールバック SVG の右下に「エディタで再生成」のチップマーカーが付き、クリックするとエディタが開いて自動で登録フローが起動する ([buildRegenUrl](src/registry.ts) の `/?regen=base64(pathname)`)。
+
+### KEY_VERSION の運用
+
+[src/registry.ts](src/registry.ts) の `KEY_VERSION` は R2 キーと Cache API キーの prefix。SVG レンダリング仕様 ([src/svg.ts](src/svg.ts) / [src/dynamic.ts](src/dynamic.ts)) を変更して「同じオプション集合でも見た目が変わる」非互換変更を入れる場合は必ず bump (`v1` → `v2`)。新オプションを追加するだけならハッシュに含まれるため bump 不要。
 
 ## PWA
 
