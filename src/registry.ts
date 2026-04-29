@@ -68,6 +68,21 @@ function escapeXmlAttr(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// SVG 全体を <a href="<editor-url>"> でラップ。
+// 単独表示や <object>/<iframe> でクリックすると編集画面に飛ぶ。
+// (<img> 経由埋め込みではブラウザ仕様上クリック無効)
+export function withEditorLink(svg: string, editorUrl: string): string {
+  // 既にラップ済みなら何もしない
+  if (svg.includes("<a class=\"ic-edit\"")) return svg;
+  const href = escapeXmlAttr(editorUrl);
+  const aOpen =
+    `<a class="ic-edit" href="${href}" target="_top" rel="noopener">` +
+    `<title>クリックでエディタを開く</title>`;
+  return svg
+    .replace(/<svg([^>]*)>/, (_m, attrs) => `<svg${attrs}>${aOpen}`)
+    .replace(/<\/svg>/, `</a></svg>`);
+}
+
 export function withErrorMarker(
   svg: string,
   width: number,
@@ -77,14 +92,12 @@ export function withErrorMarker(
   const tooltip =
     "Google Fonts の登録待ちのためフォールバック表示中です。" +
     "クリックでエディタを開き、再生成してください。";
-  const href = escapeXmlAttr(regenUrl);
   const tip = escapeXmlAttr(tooltip);
 
-  // CSS-in-SVG: ホバーで強調 + クリックカーソル
+  // CSS-in-SVG: chip はクリック対象ではなく視覚的な警告のみ。
+  // クリックは外側 `withEditorLink` の <a> が担う。
   const style =
     `<style>` +
-    `.ic-warn{cursor:pointer;transition:filter 180ms ease}` +
-    `.ic-warn:hover{filter:brightness(1.1) drop-shadow(0 0 6px rgba(245,158,11,0.55))}` +
     `.ic-warn-chip{fill:#f59e0b;stroke:#7c2d12;stroke-width:1.5}` +
     `.ic-warn-mark-bg{fill:#7c2d12}` +
     `.ic-warn-mark{fill:#fde68a;font-family:-apple-system,system-ui,sans-serif;font-weight:700;font-size:13px;dominant-baseline:central}` +
@@ -97,31 +110,25 @@ export function withErrorMarker(
   let marker: string;
   if (useChip) {
     // chip 寸法: 154 × 32, 角丸 16
-    // ┌── padL=12 ┬ circle r=11 ┬ gap=8 ┬ label ≤90 ┬ padR=22 ──┐
     const x = width - 8;
     const y = height - 8;
     marker =
-      `<a class="ic-warn" href="${href}" target="_top" rel="noopener">` +
-      `<g transform="translate(${x} ${y})">` +
+      `<g class="ic-warn" transform="translate(${x} ${y})">` +
       `<rect x="-154" y="-32" width="154" height="32" rx="16" class="ic-warn-chip"/>` +
       `<circle cx="-131" cy="-16" r="11" class="ic-warn-mark-bg"/>` +
       `<text x="-131" y="-16" text-anchor="middle" class="ic-warn-mark">!</text>` +
       `<text x="-112" y="-16" class="ic-warn-text">エディタで再生成</text>` +
       `<title>${tip}</title>` +
-      `</g>` +
-      `</a>`;
+      `</g>`;
   } else {
-    // 28 × 28 角丸ボタン (任意の小さい画像にも対応)
     const x = width - 18;
     const y = height - 18;
     marker =
-      `<a class="ic-warn" href="${href}" target="_top" rel="noopener">` +
-      `<g transform="translate(${x} ${y})">` +
+      `<g class="ic-warn" transform="translate(${x} ${y})">` +
       `<rect x="-14" y="-14" width="28" height="28" rx="8" class="ic-warn-chip"/>` +
       `<text x="0" y="0" text-anchor="middle" class="ic-warn-mark-l">!</text>` +
       `<title>${tip}</title>` +
-      `</g>` +
-      `</a>`;
+      `</g>`;
   }
 
   const comment =

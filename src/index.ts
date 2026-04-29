@@ -12,6 +12,7 @@ import {
   r2Key,
   sanitizeSvg,
   verifyTurnstile,
+  withEditorLink,
   withErrorMarker,
   type RegistryEnv,
 } from "./registry";
@@ -309,12 +310,17 @@ async function handleIcon(
 
   const needsPathLookup = isGoogleFontCandidate(parsed.rawFontValue);
 
+  // SVG 全体を <a href="<editor-url>"> でラップ。
+  // 単独表示や object/iframe からクリックでエディタへ。
+  const editorUrl = url.origin + url.pathname.replace(/\.svg$/i, "");
+
   if (needsPathLookup) {
     const hash = await computeKey(parsed);
     const key = r2Key(hash);
     const obj = await env.ICON_PATHS.get(key);
     if (obj) {
-      const svg = await obj.text();
+      const raw = await obj.text();
+      const svg = withEditorLink(raw, editorUrl);
       const response = new Response(svg, {
         headers: {
           "content-type": SVG_CONTENT_TYPE,
@@ -324,14 +330,17 @@ async function handleIcon(
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
       return response;
     }
+    // R2 未登録: chip マーカーを内部に挿入してから、外側を「自動再登録 URL」でラップ。
+    // クリックすると /?regen=base64(...) → エディタが開いて自動で登録フローが走る。
     const baseSvg = renderSvg(parsed.text, parsed.options);
     const regen = url.origin + buildRegenUrl(url.pathname);
-    const svg = withErrorMarker(
+    const withChip = withErrorMarker(
       baseSvg,
       parsed.options.width,
       parsed.options.height,
       regen,
     );
+    const svg = withEditorLink(withChip, regen);
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,
@@ -340,7 +349,8 @@ async function handleIcon(
     });
   }
 
-  const svg = renderSvg(parsed.text, parsed.options);
+  const baseSvg = renderSvg(parsed.text, parsed.options);
+  const svg = withEditorLink(baseSvg, editorUrl);
   const response = new Response(svg, {
     headers: {
       "content-type": SVG_CONTENT_TYPE,
