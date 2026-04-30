@@ -1480,6 +1480,21 @@ input[type=range]::-moz-range-thumb {
   border-color: var(--violet);
   color: var(--violet);
 }
+.vertical-btn .vertical-btn-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
+  font-weight: 600;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: -0.05em;
+}
+.vertical-btn[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 /* 絵文字トリガ: 既存のスタイル踏襲 */
 .emoji-trigger .emoji-trigger-icon {
   font-size: 1.05rem;
@@ -2206,6 +2221,9 @@ footer a:hover { color: var(--accent); }
       <div class="text-input-wrap">
         <textarea id="text" placeholder="Type... / 入力..."></textarea>
         <div class="text-tools">
+          <button type="button" id="verticalBtn" class="text-tool-btn vertical-btn" title="縦書きモード" aria-label="縦書きモード切替" aria-pressed="false">
+            <span class="vertical-btn-icon" aria-hidden="true">縦</span>
+          </button>
           <button type="button" id="mathBtn" class="text-tool-btn math-btn" title="数式モード (TeX / LaTeX)" aria-label="数式モード切替" aria-pressed="false">
             <span class="math-btn-icon" aria-hidden="true">∑</span>
           </button>
@@ -2214,6 +2232,7 @@ footer a:hover { color: var(--accent); }
           </button>
         </div>
         <input type="checkbox" id="math" hidden>
+        <input type="checkbox" id="vertical" hidden>
       </div>
     </div>
     <div id="emojiPanel" class="emoji-panel" hidden role="dialog" aria-label="絵文字を選択">

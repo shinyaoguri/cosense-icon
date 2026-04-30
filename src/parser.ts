@@ -28,6 +28,8 @@ export type ParsedPath = {
   random: boolean;
   /** /math/ セグメントがパスに含まれる場合に true。TeX としてレンダリングする */
   math: boolean;
+  /** /vertical/ /tate/ /v/ セグメントがパスに含まれる場合に true。縦書きでレンダリング */
+  vertical: boolean;
   explicit: Set<keyof IconOptions>;
   rawFontValue?: string;
 };
@@ -369,6 +371,7 @@ export function parsePath(pathname: string): ParsedPath | null {
   const state: { rawFontValue?: string } = {};
   let random = false;
   let math = false;
+  let vertical = false;
 
   for (const seg of optionSegments) {
     const segLower = seg.toLowerCase();
@@ -378,6 +381,10 @@ export function parsePath(pathname: string): ParsedPath | null {
     }
     if (segLower === "math" || segLower === "tex") {
       math = true;
+      continue;
+    }
+    if (segLower === "vertical" || segLower === "tate" || segLower === "v") {
+      vertical = true;
       continue;
     }
     for (const token of seg.split(",")) {
@@ -394,6 +401,7 @@ export function parsePath(pathname: string): ParsedPath | null {
     options: opts,
     random,
     math,
+    vertical,
     explicit,
     rawFontValue: state.rawFontValue,
   };

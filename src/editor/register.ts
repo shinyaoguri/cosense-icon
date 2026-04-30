@@ -1,8 +1,14 @@
 import { $textarea, $select } from "./dom";
 import { isGoogleFont } from "./fonts";
-import { buildSvgFromFont, ensureFont } from "./pathify";
+import { buildSvgFromFont, buildVerticalSvgFromFont, ensureFont } from "./pathify";
 import { buildSvgFromTex } from "./mathify";
-import { build, collectIconOpts, currentFontValue, isMathMode } from "./state";
+import {
+  build,
+  collectIconOpts,
+  currentFontValue,
+  isMathMode,
+  isVerticalMode,
+} from "./state";
 import { getTurnstileToken } from "./turnstile";
 
 export const registeredPaths = new Set<string>();
@@ -38,7 +44,9 @@ export async function registerCurrentPath(onProgress?: ProgressCb): Promise<void
     const font = await ensureFont(family, weight, text);
 
     onProgress?.("Path 化中...");
-    svg = buildSvgFromFont(font, lines, collectIconOpts());
+    svg = isVerticalMode()
+      ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+      : buildSvgFromFont(font, lines, collectIconOpts());
   }
 
   onProgress?.("認証中...");

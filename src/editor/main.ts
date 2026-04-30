@@ -17,7 +17,7 @@ import {
 } from "./previewResize";
 import { applyColors, applyFont } from "./presets";
 import { downloadPng, downloadSvg } from "./download";
-import { buildSvgFromFont, ensureFont } from "./pathify";
+import { buildSvgFromFont, buildVerticalSvgFromFont, ensureFont } from "./pathify";
 import { initHistory, redo, scheduleSnapshot, snapshotNow, undo } from "./history";
 import { setupEmojiPicker } from "./emoji";
 import {
@@ -36,6 +36,7 @@ import {
   collectIconOpts,
   currentFontValue,
   isMathMode,
+  isVerticalMode,
 } from "./state";
 import { setupTurnstileWidget } from "./turnstile";
 
@@ -407,6 +408,9 @@ function resetForm(): void {
   $input("math").checked = false;
   const mathBtn = document.getElementById("mathBtn");
   if (mathBtn) mathBtn.setAttribute("aria-pressed", "false");
+  $input("vertical").checked = false;
+  const verticalBtn = document.getElementById("verticalBtn");
+  if (verticalBtn) verticalBtn.setAttribute("aria-pressed", "false");
   $input("gradColor").value = "#7c3aed";
   ($input("gradColorHex") as HTMLInputElement).value = "#7c3aed";
   $input("gradAngle").value = "135";
@@ -616,6 +620,19 @@ $("mathBtn").addEventListener("click", () => {
   update();
 });
 
+// 縦書きモードトグル
+$("verticalBtn").addEventListener("click", () => {
+  const inp = $input("vertical");
+  inp.checked = !inp.checked;
+  $("verticalBtn").setAttribute("aria-pressed", String(inp.checked));
+  if (inp.checked) {
+    showToast("縦書きモード ON", "success", 1500);
+  } else {
+    showToast("縦書きモード OFF", "info", 1200);
+  }
+  update();
+});
+
 // キーボードショートカット
 document.addEventListener("keydown", e => {
   // テキスト入力中はショートカットを無視 (テキスト編集を妨げない)
@@ -712,7 +729,9 @@ async function getCurrentSvgText(): Promise<string> {
     // Google Fonts は Path 化して生成 (登録不要、クライアント完結)
     const font = await ensureFont(family, $select("weight").value, text);
     const lines = text.split(/\r?\n/);
-    return buildSvgFromFont(font, lines, collectIconOpts());
+    return isVerticalMode()
+      ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+      : buildSvgFromFont(font, lines, collectIconOpts());
   }
   // それ以外は Worker から取得
   const res = await fetch(build());

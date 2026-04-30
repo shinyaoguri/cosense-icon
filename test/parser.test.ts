@@ -155,6 +155,39 @@ describe("parsePath", () => {
     const r = parsePath("/MATH/x.svg")!;
     expect(r.math).toBe(true);
   });
+
+  it("vertical セグメントを検出する", () => {
+    const r = parsePath("/vertical/縦書き.svg")!;
+    expect(r.vertical).toBe(true);
+    expect(r.text.join("")).toBe("縦書き");
+  });
+
+  it("tate は vertical のエイリアス", () => {
+    const r = parsePath("/tate/あいう.svg")!;
+    expect(r.vertical).toBe(true);
+  });
+
+  it("v は vertical のエイリアス", () => {
+    const r = parsePath("/v/あいう.svg")!;
+    expect(r.vertical).toBe(true);
+  });
+
+  it("vertical は他オプションと並列に並べられる", () => {
+    const r = parsePath("/bg-fff/vertical/fg-000/縦.svg")!;
+    expect(r.vertical).toBe(true);
+    expect(r.options.bg).toBe("#fff");
+    expect(r.options.fg).toBe("#000");
+  });
+
+  it("vertical 指定がなければ vertical=false", () => {
+    const r = parsePath("/Hello.svg")!;
+    expect(r.vertical).toBe(false);
+  });
+
+  it("vertical セグメントは大文字小文字を区別しない", () => {
+    const r = parsePath("/VERTICAL/x.svg")!;
+    expect(r.vertical).toBe(true);
+  });
 });
 
 describe("isGoogleFontCandidate", () => {

@@ -192,11 +192,17 @@ export function applyPathname(pathname: string): void {
   if (textRaw) $textarea("text").value = textRaw.replace(/\\n/g, "\n");
 
   // /math/ または /tex/ セグメントの有無で数式モードを切替
+  // /vertical/ /tate/ /v/ セグメントの有無で縦書きモードを切替
   let math = false;
+  let vertical = false;
   segs.slice(0, -1).forEach(seg => {
     const segLower = seg.toLowerCase();
     if (segLower === "math" || segLower === "tex") {
       math = true;
+      return;
+    }
+    if (segLower === "vertical" || segLower === "tate" || segLower === "v") {
+      vertical = true;
       return;
     }
     if (segLower === "random") return; // 既存処理は別 (random はサーバ判定だけで OK)
@@ -214,4 +220,8 @@ export function applyPathname(pathname: string): void {
   if (mathInp) mathInp.checked = math;
   const mathBtn = document.getElementById("mathBtn");
   if (mathBtn) mathBtn.setAttribute("aria-pressed", String(math));
+  const vertInp = document.getElementById("vertical") as HTMLInputElement | null;
+  if (vertInp) vertInp.checked = vertical;
+  const vertBtn = document.getElementById("verticalBtn");
+  if (vertBtn) vertBtn.setAttribute("aria-pressed", String(vertical));
 }

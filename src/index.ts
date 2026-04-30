@@ -16,7 +16,7 @@ import {
   withErrorMarker,
   type RegistryEnv,
 } from "./registry";
-import { renderSvg } from "./svg";
+import { renderSvg, renderVerticalSvg } from "./svg";
 
 const NO_STORE_HEADERS = {
   "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -336,7 +336,9 @@ async function handleIcon(
     }
     // R2 未登録: chip マーカーを内部に挿入してから、外側を「自動再登録 URL」でラップ。
     // クリックすると /?regen=base64(...) → エディタが開いて自動で登録フローが走る。
-    const baseSvg = renderSvg(parsed.text, parsed.options);
+    const baseSvg = parsed.vertical
+      ? renderVerticalSvg(parsed.text, parsed.options)
+      : renderSvg(parsed.text, parsed.options);
     const regen = url.origin + buildRegenUrl(url.pathname);
     const withChip = withErrorMarker(
       baseSvg,
@@ -353,7 +355,9 @@ async function handleIcon(
     });
   }
 
-  const baseSvg = renderSvg(parsed.text, parsed.options);
+  const baseSvg = parsed.vertical
+    ? renderVerticalSvg(parsed.text, parsed.options)
+    : renderSvg(parsed.text, parsed.options);
   const svg = withEditorLink(baseSvg, editorUrl);
   const response = new Response(svg, {
     headers: {

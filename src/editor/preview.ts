@@ -1,8 +1,14 @@
 import { $, $textarea, $select, $input } from "./dom";
 import { isGoogleFont } from "./fonts";
-import { buildSvgFromFont, ensureFont } from "./pathify";
+import { buildSvgFromFont, buildVerticalSvgFromFont, ensureFont } from "./pathify";
 import { buildSvgFromTex } from "./mathify";
-import { build, collectIconOpts, currentFontValue, isMathMode } from "./state";
+import {
+  build,
+  collectIconOpts,
+  currentFontValue,
+  isMathMode,
+  isVerticalMode,
+} from "./state";
 import { showToast } from "./toast";
 
 let _previewObjectUrl: string | null = null;
@@ -28,6 +34,9 @@ export function cancelScheduledPreview(): void {
 export async function renderPathifyPreview(): Promise<void> {
   const family = currentFontValue();
   const mathOn = isMathMode();
+  const verticalOn = isVerticalMode();
+  // サーバ側で縦書きを描画できるので、システムフォント + 縦書きでも
+  // ここでクライアント側プレビューに乗せる必要はない。Google Fonts のときだけ path 化が必要。
   if (!mathOn && !isGoogleFont(family)) return;
   const text = $textarea("text").value || "sample";
   const weight = $select("weight").value;
@@ -41,7 +50,9 @@ export async function renderPathifyPreview(): Promise<void> {
       const font = await ensureFont(family, weight, text);
       if (reqId !== _previewReqId) return;
       const lines = text.split(/\r?\n/);
-      svg = buildSvgFromFont(font, lines, collectIconOpts());
+      svg = verticalOn
+        ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+        : buildSvgFromFont(font, lines, collectIconOpts());
     }
     if (reqId !== _previewReqId) return;
     const blob = new Blob([svg], { type: "image/svg+xml" });

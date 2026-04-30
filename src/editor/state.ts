@@ -101,6 +101,11 @@ export function isMathMode(): boolean {
   return !!inp?.checked;
 }
 
+export function isVerticalMode(): boolean {
+  const inp = document.getElementById("vertical") as HTMLInputElement | null;
+  return !!inp?.checked;
+}
+
 export function build(): string {
   const opts: string[] = [];
   const bg = $input("bg").value.toLowerCase();
@@ -151,6 +156,9 @@ export function build(): string {
   // 数式モード: 末尾近くに /math/ セグメントを挿入 (オプションと並列)
   const mathInp = document.getElementById("math") as HTMLInputElement | null;
   if (mathInp?.checked) opts.push("math");
+  // 縦書きモード: 同様に /vertical/ セグメントを挿入
+  const vertInp = document.getElementById("vertical") as HTMLInputElement | null;
+  if (vertInp?.checked) opts.push("vertical");
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {
