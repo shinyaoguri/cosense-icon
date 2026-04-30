@@ -191,7 +191,15 @@ export function applyPathname(pathname: string): void {
   const textRaw = last.replace(/\.svg$/i, "");
   if (textRaw) $textarea("text").value = textRaw.replace(/\\n/g, "\n");
 
+  // /math/ または /tex/ セグメントの有無で数式モードを切替
+  let math = false;
   segs.slice(0, -1).forEach(seg => {
+    const segLower = seg.toLowerCase();
+    if (segLower === "math" || segLower === "tex") {
+      math = true;
+      return;
+    }
+    if (segLower === "random") return; // 既存処理は別 (random はサーバ判定だけで OK)
     seg.split(",").forEach(tok => {
       const m = tok.match(/^([^-=:]+)[-=:](.*)$/);
       if (!m) return;
@@ -202,4 +210,8 @@ export function applyPathname(pathname: string): void {
       applySingleOpt(key, val);
     });
   });
+  const mathInp = document.getElementById("math") as HTMLInputElement | null;
+  if (mathInp) mathInp.checked = math;
+  const mathBtn = document.getElementById("mathBtn");
+  if (mathBtn) mathBtn.setAttribute("aria-pressed", String(math));
 }

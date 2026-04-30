@@ -33,6 +33,12 @@ describe("computeKey", () => {
     const hash = await computeKey(a);
     expect(hash).toMatch(/^[0-9a-f]{32}$/);
   });
+
+  it("math フラグ違いは別ハッシュ", async () => {
+    const a = parsePath("/y=x^2.svg")!;
+    const b = parsePath("/math/y=x^2.svg")!;
+    expect(await computeKey(a)).not.toBe(await computeKey(b));
+  });
 });
 
 describe("r2Key", () => {

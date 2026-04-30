@@ -96,6 +96,11 @@ export function currentFontValue(): string {
   return v;
 }
 
+export function isMathMode(): boolean {
+  const inp = document.getElementById("math") as HTMLInputElement | null;
+  return !!inp?.checked;
+}
+
 export function build(): string {
   const opts: string[] = [];
   const bg = $input("bg").value.toLowerCase();
@@ -143,6 +148,9 @@ export function build(): string {
     const ga = +$input("gradAngle").value || 135;
     if (ga !== 135) opts.push("angle-" + ga);
   }
+  // 数式モード: 末尾近くに /math/ セグメントを挿入 (オプションと並列)
+  const mathInp = document.getElementById("math") as HTMLInputElement | null;
+  if (mathInp?.checked) opts.push("math");
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {

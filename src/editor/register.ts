@@ -1,29 +1,45 @@
 import { $textarea, $select } from "./dom";
 import { isGoogleFont } from "./fonts";
 import { buildSvgFromFont, ensureFont } from "./pathify";
-import { build, collectIconOpts, currentFontValue } from "./state";
+import { buildSvgFromTex } from "./mathify";
+import { build, collectIconOpts, currentFontValue, isMathMode } from "./state";
 import { getTurnstileToken } from "./turnstile";
 
 export const registeredPaths = new Set<string>();
 
 export type ProgressCb = (msg: string) => void;
 
+/** 登録対象 (Google Fonts または 数式モード) かどうか */
+export function needsRegistration(): boolean {
+  return isMathMode() || isGoogleFont(currentFontValue());
+}
+
 export async function registerCurrentPath(onProgress?: ProgressCb): Promise<void> {
-  const family = currentFontValue();
-  if (!isGoogleFont(family)) return;
+  if (!needsRegistration()) return;
 
   const pathname = build();
   if (registeredPaths.has(pathname)) return;
 
-  const text = $textarea("text").value || "sample";
-  const lines = text.split(/\r?\n/);
-  const weight = $select("weight").value;
+  let svg: string;
 
-  onProgress?.("フォント取得中...");
-  const font = await ensureFont(family, weight, text);
+  if (isMathMode()) {
+    const text = $textarea("text").value;
+    if (!text.trim()) throw new Error("数式が空です");
+    onProgress?.("MathJax 読み込み中...");
+    onProgress?.("数式を SVG パスに変換中...");
+    svg = await buildSvgFromTex(text, collectIconOpts());
+  } else {
+    const family = currentFontValue();
+    const text = $textarea("text").value || "sample";
+    const lines = text.split(/\r?\n/);
+    const weight = $select("weight").value;
 
-  onProgress?.("Path 化中...");
-  const svg = buildSvgFromFont(font, lines, collectIconOpts());
+    onProgress?.("フォント取得中...");
+    const font = await ensureFont(family, weight, text);
+
+    onProgress?.("Path 化中...");
+    svg = buildSvgFromFont(font, lines, collectIconOpts());
+  }
 
   onProgress?.("認証中...");
   const token = await getTurnstileToken();

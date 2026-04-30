@@ -35,6 +35,7 @@ function normalizedKeyParts(parsed: ParsedPath): string {
     `shadow=${o.shadow ?? ""}-${o.shadowColor ?? ""}-${o.shadowBlur ?? 0}`,
     `stroke=${o.stroke ?? ""}-${o.strokeWidth ?? 0}`,
     `grad=${o.gradTo ?? ""}-${o.gradAngle ?? 135}`,
+    `math=${parsed.math ? "1" : "0"}`,
   ].join("|");
 }
 

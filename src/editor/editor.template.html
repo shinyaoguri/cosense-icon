@@ -1425,16 +1425,21 @@ input[type=range]::-moz-range-thumb {
 .text-input-wrap textarea {
   width: 100%;
   display: block;
-  /* 右下に絵文字ボタンを配置するため余白を確保 */
-  padding-right: 3.2rem;
+  /* 右下にツール群を配置するため余白を確保 */
+  padding-right: 5.5rem;
   padding-bottom: 2.4rem;
 }
 
-/* 絵文字トリガ: テキストボックス右下に重ねる小さいアイコンボタン */
-.emoji-trigger {
+/* テキスト下部のツール群 (数式 / 絵文字) */
+.text-tools {
   position: absolute;
   bottom: 0.5rem;
-  right: 1.1rem; /* 右下のリサイズグリップを避ける */
+  right: 1.1rem; /* リサイズグリップを避ける */
+  display: inline-flex;
+  gap: 0.3rem;
+  z-index: 2;
+}
+.text-tool-btn {
   width: 1.85rem;
   height: 1.85rem;
   padding: 0;
@@ -1451,28 +1456,42 @@ input[type=range]::-moz-range-thumb {
   opacity: 0.55;
   transition: all var(--transition-fast);
   font: inherit;
-  z-index: 2;
 }
+.text-input-wrap:hover .text-tool-btn,
+.text-tool-btn:focus-visible {
+  opacity: 1;
+  border-color: var(--border);
+}
+.text-tool-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.math-btn .math-btn-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  font-family: 'Times New Roman', serif;
+  font-weight: 700;
+  font-style: italic;
+}
+.math-btn[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--violet-soft);
+  border-color: var(--violet);
+  color: var(--violet);
+}
+/* 絵文字トリガ: 既存のスタイル踏襲 */
 .emoji-trigger .emoji-trigger-icon {
   font-size: 1.05rem;
   line-height: 1;
   filter: grayscale(0.05);
   font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
 }
-.text-input-wrap:hover .emoji-trigger,
-.emoji-trigger:focus-visible {
-  opacity: 1;
-  border-color: var(--border);
-}
-.emoji-trigger:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-1px);
-}
 .emoji-trigger[aria-expanded="true"] {
   opacity: 1;
   background: var(--accent-soft);
   border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* 絵文字パネル: フローティング・ポップオーバー (form の overflow を抜けるため fixed) */
@@ -2186,9 +2205,15 @@ footer a:hover { color: var(--accent); }
     <div class="stack">
       <div class="text-input-wrap">
         <textarea id="text" placeholder="Type... / 入力..."></textarea>
-        <button type="button" id="emojiBtn" class="emoji-trigger" title="絵文字を挿入" aria-label="絵文字を挿入" aria-expanded="false">
-          <span class="emoji-trigger-icon" aria-hidden="true">😀</span>
-        </button>
+        <div class="text-tools">
+          <button type="button" id="mathBtn" class="text-tool-btn math-btn" title="数式モード (TeX / LaTeX)" aria-label="数式モード切替" aria-pressed="false">
+            <span class="math-btn-icon" aria-hidden="true">∑</span>
+          </button>
+          <button type="button" id="emojiBtn" class="text-tool-btn emoji-trigger" title="絵文字を挿入" aria-label="絵文字を挿入" aria-expanded="false">
+            <span class="emoji-trigger-icon" aria-hidden="true">😀</span>
+          </button>
+        </div>
+        <input type="checkbox" id="math" hidden>
       </div>
     </div>
     <div id="emojiPanel" class="emoji-panel" hidden role="dialog" aria-label="絵文字を選択">

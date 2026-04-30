@@ -127,6 +127,34 @@ describe("parsePath", () => {
     const r = parsePath("/Hi.svg")!;
     expect(r.rawFontValue).toBeUndefined();
   });
+
+  it("math セグメントを検出する", () => {
+    const r = parsePath("/math/y=x^2.svg")!;
+    expect(r.math).toBe(true);
+    expect(r.text.join("")).toBe("y=x^2");
+  });
+
+  it("tex は math のエイリアス", () => {
+    const r = parsePath("/tex/y=x^2.svg")!;
+    expect(r.math).toBe(true);
+  });
+
+  it("math は他オプションと並列に並べられる", () => {
+    const r = parsePath("/bg-fff/math/fg-000/E=mc^2.svg")!;
+    expect(r.math).toBe(true);
+    expect(r.options.bg).toBe("#fff");
+    expect(r.options.fg).toBe("#000");
+  });
+
+  it("math 指定がなければ math=false", () => {
+    const r = parsePath("/Hello.svg")!;
+    expect(r.math).toBe(false);
+  });
+
+  it("math セグメントは大文字小文字を区別しない", () => {
+    const r = parsePath("/MATH/x.svg")!;
+    expect(r.math).toBe(true);
+  });
 });
 
 describe("isGoogleFontCandidate", () => {

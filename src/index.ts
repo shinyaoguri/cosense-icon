@@ -308,7 +308,11 @@ async function handleIcon(
 
   applyRandomPalette(parsed);
 
-  const needsPathLookup = isGoogleFontCandidate(parsed.rawFontValue);
+  // R2 ルックアップが必要なケース:
+  //   - Google Fonts 指定 (ブラウザ側で path 化したものを R2 に保存)
+  //   - 数式モード (ブラウザ側で MathJax レンダリングしたものを R2 に保存)
+  const needsPathLookup =
+    isGoogleFontCandidate(parsed.rawFontValue) || parsed.math;
 
   // SVG 全体を <a href="<editor-url>"> でラップ。
   // 単独表示や object/iframe からクリックでエディタへ。
@@ -398,8 +402,10 @@ async function handleRegister(
 
   const parsed = parsePath(body.pathname);
   if (!parsed) return new Response("invalid pathname", { status: 400 });
-  if (!isGoogleFontCandidate(parsed.rawFontValue)) {
-    return new Response("no google font specified", { status: 400 });
+  if (!isGoogleFontCandidate(parsed.rawFontValue) && !parsed.math) {
+    return new Response("nothing to register (no google font / math)", {
+      status: 400,
+    });
   }
 
   const sanitized = sanitizeSvg(body.svg);

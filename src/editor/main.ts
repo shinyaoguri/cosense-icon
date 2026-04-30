@@ -35,13 +35,16 @@ import {
   build,
   collectIconOpts,
   currentFontValue,
+  isMathMode,
 } from "./state";
 import { setupTurnstileWidget } from "./turnstile";
 
 function updateRegisterUI(): void {
   const useGF = isGoogleFont(currentFontValue());
-  const registered = useGF && registeredPaths.has(build());
-  const pending = useGF && !registered;
+  const useMath = isMathMode();
+  const needsReg = useGF || useMath;
+  const registered = needsReg && registeredPaths.has(build());
+  const pending = needsReg && !registered;
 
   $("fontInfoTip").classList.toggle("show", useGF);
 
@@ -116,7 +119,7 @@ function update(): void {
   updateContrast();
   updateRegisterUI();
 
-  if (isGoogleFont(currentFontValue())) {
+  if (isMathMode() || isGoogleFont(currentFontValue())) {
     schedulePathifyPreview();
   } else {
     cancelScheduledPreview();
@@ -401,6 +404,9 @@ function resetForm(): void {
   $("customFontWrap").classList.remove("show");
   $input("rotate").value = "0";
   $input("grad").checked = false;
+  $input("math").checked = false;
+  const mathBtn = document.getElementById("mathBtn");
+  if (mathBtn) mathBtn.setAttribute("aria-pressed", "false");
   $input("gradColor").value = "#7c3aed";
   ($input("gradColorHex") as HTMLInputElement).value = "#7c3aed";
   $input("gradAngle").value = "135";
@@ -582,6 +588,34 @@ renderFavList();
 
 setupEmojiPicker(update);
 
+// 数式モードトグル
+$("mathBtn").addEventListener("click", () => {
+  const inp = $input("math");
+  inp.checked = !inp.checked;
+  $("mathBtn").setAttribute("aria-pressed", String(inp.checked));
+  if (inp.checked) {
+    showToast("MathJax を読み込み中...", "progress");
+    void import("./mathify")
+      .then(m => m.ensureMathJax())
+      .then(() => {
+        showToast("数式モード ON: TeX/LaTeX 記法で入力できます", "success", 2000);
+        // 読み込み完了後、明示的にプレビュー再描画 (debounce 待ちを短縮)
+        update();
+      })
+      .catch(e => {
+        console.error("MathJax load failed:", e);
+        showToast(
+          "MathJax の読み込みに失敗しました: " +
+            (e instanceof Error ? e.message : String(e)),
+          "error",
+        );
+      });
+  } else {
+    showToast("数式モード OFF", "info", 1200);
+  }
+  update();
+});
+
 // キーボードショートカット
 document.addEventListener("keydown", e => {
   // テキスト入力中はショートカットを無視 (テキスト編集を妨げない)
@@ -670,6 +704,10 @@ document
 async function getCurrentSvgText(): Promise<string> {
   const family = currentFontValue();
   const text = $textarea("text").value || "sample";
+  if (isMathMode()) {
+    const { buildSvgFromTex } = await import("./mathify");
+    return buildSvgFromTex(text, collectIconOpts());
+  }
   if (isGoogleFont(family)) {
     // Google Fonts は Path 化して生成 (登録不要、クライアント完結)
     const font = await ensureFont(family, $select("weight").value, text);
@@ -745,7 +783,8 @@ document
       if (!targetId) return;
       const target = document.getElementById(targetId) as HTMLInputElement;
       const needsRegister =
-        isGoogleFont(currentFontValue()) && !registeredPaths.has(build());
+        (isMathMode() || isGoogleFont(currentFontValue())) &&
+        !registeredPaths.has(build());
 
       const isShareItem = btn.classList.contains("share-item");
       const itemLabels: Record<string, string> = {
@@ -759,12 +798,17 @@ document
         btn.classList.remove("needs-register");
         btn.disabled = true;
         if (!isShareItem) btn.textContent = "登録中...";
-        showToast("Google Fonts を登録しています...", "progress");
+        const initialMsg = isMathMode()
+          ? "数式を SVG として登録しています..."
+          : "Google Fonts を登録しています...";
+        showToast(initialMsg, "progress");
         try {
           await registerCurrentPath(msg => {
             // 進捗段階に応じてより具体的な文言にする
             const detail =
-              msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
+              msg.startsWith("MathJax") ? "MathJax を読み込み中..."
+              : msg.startsWith("数式") ? "数式を SVG パスに変換中..."
+              : msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
               : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
               : msg.startsWith("認証") ? "Turnstile で認証中..."
               : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."
@@ -843,11 +887,16 @@ const STORAGE_KEY = "cosense-icon:lastPath";
     applyPathname(pathname);
     update();
     setTimeout(() => {
-      if (isGoogleFont(currentFontValue())) {
-        showToast("Google Fonts を登録しています...", "progress");
+      if (isMathMode() || isGoogleFont(currentFontValue())) {
+        const initial = isMathMode()
+          ? "数式を SVG として登録しています..."
+          : "Google Fonts を登録しています...";
+        showToast(initial, "progress");
         registerCurrentPath(msg => {
           const detail =
-            msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
+            msg.startsWith("MathJax") ? "MathJax を読み込み中..."
+            : msg.startsWith("数式") ? "数式を SVG パスに変換中..."
+            : msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
             : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
             : msg.startsWith("認証") ? "Turnstile で認証中..."
             : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."

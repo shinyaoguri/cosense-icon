@@ -26,6 +26,8 @@ export type ParsedPath = {
   text: string[];
   options: IconOptions;
   random: boolean;
+  /** /math/ セグメントがパスに含まれる場合に true。TeX としてレンダリングする */
+  math: boolean;
   explicit: Set<keyof IconOptions>;
   rawFontValue?: string;
 };
@@ -366,10 +368,16 @@ export function parsePath(pathname: string): ParsedPath | null {
   const explicit = new Set<keyof IconOptions>();
   const state: { rawFontValue?: string } = {};
   let random = false;
+  let math = false;
 
   for (const seg of optionSegments) {
-    if (seg.toLowerCase() === "random") {
+    const segLower = seg.toLowerCase();
+    if (segLower === "random") {
       random = true;
+      continue;
+    }
+    if (segLower === "math" || segLower === "tex") {
+      math = true;
       continue;
     }
     for (const token of seg.split(",")) {
@@ -385,6 +393,7 @@ export function parsePath(pathname: string): ParsedPath | null {
     text: parseText(textRaw),
     options: opts,
     random,
+    math,
     explicit,
     rawFontValue: state.rawFontValue,
   };

@@ -1,7 +1,9 @@
 import { $, $textarea, $select, $input } from "./dom";
 import { isGoogleFont } from "./fonts";
 import { buildSvgFromFont, ensureFont } from "./pathify";
-import { build, collectIconOpts, currentFontValue } from "./state";
+import { buildSvgFromTex } from "./mathify";
+import { build, collectIconOpts, currentFontValue, isMathMode } from "./state";
+import { showToast } from "./toast";
 
 let _previewObjectUrl: string | null = null;
 let _previewDebounceTimer: number | null = null;
@@ -25,16 +27,22 @@ export function cancelScheduledPreview(): void {
 
 export async function renderPathifyPreview(): Promise<void> {
   const family = currentFontValue();
-  if (!isGoogleFont(family)) return;
+  const mathOn = isMathMode();
+  if (!mathOn && !isGoogleFont(family)) return;
   const text = $textarea("text").value || "sample";
   const weight = $select("weight").value;
   const reqId = ++_previewReqId;
   const preview = $input("preview") as unknown as HTMLImageElement;
   try {
-    const font = await ensureFont(family, weight, text);
-    if (reqId !== _previewReqId) return;
-    const lines = text.split(/\r?\n/);
-    const svg = buildSvgFromFont(font, lines, collectIconOpts());
+    let svg: string;
+    if (mathOn) {
+      svg = await buildSvgFromTex(text, collectIconOpts());
+    } else {
+      const font = await ensureFont(family, weight, text);
+      if (reqId !== _previewReqId) return;
+      const lines = text.split(/\r?\n/);
+      svg = buildSvgFromFont(font, lines, collectIconOpts());
+    }
     if (reqId !== _previewReqId) return;
     const blob = new Blob([svg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
@@ -43,9 +51,14 @@ export async function renderPathifyPreview(): Promise<void> {
     preview.src = url;
   } catch (e) {
     if (reqId !== _previewReqId) return;
-    console.warn("pathify preview failed", e);
+    console.warn("preview render failed", e);
     revokePreviewUrl();
     preview.src = build();
+    if (isMathMode()) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // TeX 構文エラー等もここに来るので簡潔に通知
+      showToast("数式の描画に失敗: " + msg.slice(0, 100), "error", 4000);
+    }
   }
 }
 
