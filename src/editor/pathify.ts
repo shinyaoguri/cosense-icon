@@ -1,6 +1,7 @@
 import { xmlEscape } from "./dom";
 import type { IconOpts } from "./state";
-import type { OpenTypeFont } from "./types";
+import type { OpenTypeFont, OpenTypeGlyph } from "./types";
+import { fitFontSizeWithWrap, wrapLines as wrapAllLines } from "../textwrap";
 
 // 縦書きで上向きのまま組む文字 (CJK 系)
 function isCJK(ch: string): boolean {
@@ -68,6 +69,34 @@ function getVertSubMap(font: OpenTypeFont): Map<number, number> {
     // 一部フォントで例外を投げることがある。無視して identity に倒す
   }
   return map;
+}
+
+// グリフ index → defs 内 id のレジスタ。<use> で参照される。
+// 同じ字が繰り返し出現するほど削減効果が大きい (CJK 文章で 30〜60%)
+class GlyphRegistry {
+  private defs: string[] = [];
+  private seen = new Set<number>();
+  constructor(
+    private font: OpenTypeFont,
+    private fontSize: number,
+  ) {}
+
+  // glyph を defs に登録 (重複は無視)。返り値は <use href="#..."> 用の id。
+  register(glyph: OpenTypeGlyph): string {
+    const idx = glyph.index;
+    const id = `g${idx}`;
+    if (this.seen.has(idx)) return id;
+    this.seen.add(idx);
+    // origin (0, 0) で 1 回だけ path 化。<use x= y=> で位置決めする。
+    const d = glyph.getPath(0, 0, this.fontSize).toPathData(1);
+    // 空 d の場合は空 <symbol> を出さず、<use> 側で空表示にする (id ありの空 <g>)
+    this.defs.push(`<g id="${id}"><path d="${d}"/></g>`);
+    return id;
+  }
+
+  defsHtml(): string {
+    return this.defs.join("");
+  }
 }
 
 export async function fetchFontCss(
@@ -198,13 +227,28 @@ export function buildSvgFromFont(
   font: OpenTypeFont,
   lines: string[],
   opts: IconOpts,
+  wrap = false,
 ): string {
   const { width, height, padding, bg, fg, radius, align, lh } = opts;
   const innerW = Math.max(1, width - padding * 2);
   const innerH = Math.max(1, height - padding * 2);
 
+  // 実フォントのアドバンス幅 (em 単位、size=1 で測る)
+  const charWidthEm = (ch: string): number => font.getAdvanceWidth(ch, 1);
+
   let fontSize: number;
-  if (opts.size) {
+  let renderLines = lines;
+
+  if (wrap) {
+    if (opts.size) {
+      fontSize = opts.size;
+      renderLines = wrapAllLines(lines, innerW / fontSize, charWidthEm);
+    } else {
+      const fit = fitFontSizeWithWrap(lines, innerW, innerH, lh, charWidthEm);
+      fontSize = fit.fontSize;
+      renderLines = fit.wrappedLines;
+    }
+  } else if (opts.size) {
     fontSize = opts.size;
   } else {
     const probe = 100;
@@ -217,18 +261,42 @@ export function buildSvgFromFont(
     fontSize = Math.max(8, Math.min(maxByWidth, maxByHeight));
   }
 
-  const totalTextHeight = fontSize * lh * lines.length;
+  const totalTextHeight = fontSize * lh * renderLines.length;
   const startY = (height - totalTextHeight) / 2 + fontSize * lh * 0.8;
 
-  const pathDatas = lines.map((line, i) => {
+  const upe = font.unitsPerEm ?? 1000;
+  const registry = new GlyphRegistry(font, fontSize);
+  const useEls: string[] = [];
+
+  for (let i = 0; i < renderLines.length; i++) {
+    const line = renderLines[i]!;
     const y = startY + i * fontSize * lh;
     const lineWidth = font.getAdvanceWidth(line, fontSize);
     let x: number;
     if (align === "left") x = padding;
     else if (align === "right") x = width - padding - lineWidth;
     else x = (width - lineWidth) / 2;
-    return font.getPath(line, x, y, fontSize).toPathData(2);
-  });
+
+    // GSUB shaping (liga 等) を適用したグリフ列
+    const shaped = font.stringToGlyphs?.(line);
+    if (!shaped || shaped.length === 0) continue;
+
+    let cursorX = x;
+    const unit = fontSize / upe;
+    for (let gi = 0; gi < shaped.length; gi++) {
+      const glyph = shaped[gi]!;
+      // GPOS kern (Latin で重要、CJK ではほぼ 0)
+      if (gi > 0 && font.getKerningValue) {
+        const kern = font.getKerningValue(shaped[gi - 1]!, glyph) ?? 0;
+        cursorX += kern * unit;
+      }
+      const id = registry.register(glyph);
+      useEls.push(
+        `<use href="#${id}" x="${cursorX.toFixed(1)}" y="${y.toFixed(1)}"/>`,
+      );
+      cursorX += (glyph.advanceWidth ?? upe) * unit;
+    }
+  }
 
   // 背景: gradient or 単色
   const useGrad = !!opts.gradTo;
@@ -258,17 +326,19 @@ export function buildSvgFromFont(
     );
   }
   if (gradDef) defParts.push(gradDef);
-  const filterDef = defParts.length > 0 ? `<defs>${defParts.join("")}</defs>` : "";
+  // グリフ定義を defs に同梱
+  const glyphDefs = registry.defsHtml();
+  const allDefParts = [...defParts, glyphDefs].filter(s => s.length > 0);
+  const filterDef = allDefParts.length > 0 ? `<defs>${allDefParts.join("")}</defs>` : "";
   const filterAttr = useShadow ? ` filter="url(#ds)"` : "";
   const strokeAttrs =
     opts.stroke && (opts.strokeWidth ?? 0) > 0
       ? ` stroke="${xmlEscape(opts.stroke)}" stroke-width="${opts.strokeWidth}" stroke-linejoin="round" paint-order="stroke fill"`
       : "";
-  const pathEls = pathDatas
-    .map(d => `<path d="${d}" fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}/>`)
-    .join("\n");
+  // <use> は単一の親 <g> でまとめて塗り/縁取り/影属性を共有 (1 字ごとに付けるとサイズ膨張)
+  const textLayer = `<g fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}>${useEls.join("")}</g>`;
 
-  const inner = `${filterDef}${bgShape}\n${pathEls}`;
+  const inner = `${filterDef}${bgShape}\n${textLayer}`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
 
@@ -323,7 +393,11 @@ export function buildVerticalSvgFromFont(
     rightCenterX = (width - totalColsW) / 2 + totalColsW - colWidth / 2;
   }
 
-  const pathParts: string[] = [];
+  const registry = new GlyphRegistry(font, fontSize);
+  const useEls: string[] = [];
+  // TCY セル内の小グリフ群は registry とは別 fontSize 系列なので、
+  // group ごとの transform で位置決めし、内部に <use> を並べる。
+  // (TCY は CJK と同じ fontSize の glyph を使うが、scaleX で潰す)
 
   for (let ci = 0; ci < lines.length; ci++) {
     const cells = colCells[ci]!;
@@ -351,11 +425,13 @@ export function buildVerticalSvgFromFont(
         }
         const targetIndex = vertSubMap.get(glyph.index) ?? glyph.index;
         const g = font.glyphs?.get(targetIndex) ?? glyph;
+        const id = registry.register(g);
         const glyphAdv = ((g.advanceWidth ?? upe) * fontSize) / upe;
         const x = colCenterX - glyphAdv / 2;
         const baselineY = cellTopY + ascRatio * fontSize;
-        const d = g.getPath(x, baselineY, fontSize).toPathData(2);
-        pathParts.push(`<path d="${d}"/>`);
+        useEls.push(
+          `<use href="#${id}" x="${x.toFixed(1)}" y="${baselineY.toFixed(1)}"/>`,
+        );
       } else if (cell.type === "rotate") {
         const glyph = font.charToGlyph?.(cell.ch);
         if (!glyph) {
@@ -363,17 +439,21 @@ export function buildVerticalSvgFromFont(
           continue;
         }
         const g = font.glyphs?.get(glyph.index) ?? glyph;
+        const id = registry.register(g);
         const glyphAdv = ((g.advanceWidth ?? upe * 0.5) * fontSize) / upe;
         const x = colCenterX - glyphAdv / 2;
-        // ラテン文字の視覚中心 ≈ baseline - 0.25em。
-        // セル中心と一致させるため baseline を cellCenter + 0.25em に
         const baselineY = cellCenterY + fontSize * 0.25;
-        const d = g.getPath(x, baselineY, fontSize).toPathData(2);
-        pathParts.push(
-          `<g transform="rotate(90 ${colCenterX.toFixed(2)} ${cellCenterY.toFixed(2)})"><path d="${d}"/></g>`,
+        // <use> 自身に transform を載せて回転 (個別 <g> でラップしない)
+        useEls.push(
+          `<use href="#${id}" x="${x.toFixed(1)}" y="${baselineY.toFixed(1)}" transform="rotate(90 ${colCenterX.toFixed(2)} ${cellCenterY.toFixed(2)})"/>`,
         );
       } else {
-        // tcy: 1〜2 桁を 1 em 角に圧縮
+        // tcy: 1〜2 桁を 1 em 角に圧縮。文字毎にグリフを並べて <g> に scaleX を当てる
+        const shaped = font.stringToGlyphs?.(cell.text);
+        if (!shaped || shaped.length === 0) {
+          cellTopY += fontSize;
+          continue;
+        }
         const runAdv = font.getAdvanceWidth(cell.text, fontSize);
         if (runAdv <= 0) {
           cellTopY += fontSize;
@@ -383,9 +463,18 @@ export function buildVerticalSvgFromFont(
         const scaleX = targetW / runAdv;
         const tx = colCenterX - targetW / 2;
         const ty = cellTopY + ascRatio * fontSize;
-        const d = font.getPath(cell.text, 0, 0, fontSize).toPathData(2);
-        pathParts.push(
-          `<g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scaleX.toFixed(4)} 1)"><path d="${d}"/></g>`,
+        // group 内ローカル座標で並べた <use> 列を transform で配置
+        let cursor = 0;
+        const inner: string[] = [];
+        for (const gly of shaped) {
+          const id = registry.register(gly);
+          inner.push(
+            `<use href="#${id}" x="${cursor.toFixed(1)}" y="0"/>`,
+          );
+          cursor += ((gly.advanceWidth ?? upe) * fontSize) / upe;
+        }
+        useEls.push(
+          `<g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scaleX.toFixed(4)} 1)">${inner.join("")}</g>`,
         );
       }
       cellTopY += fontSize;
@@ -421,7 +510,9 @@ export function buildVerticalSvgFromFont(
     );
   }
   if (gradDef) defParts.push(gradDef);
-  const filterDef = defParts.length > 0 ? `<defs>${defParts.join("")}</defs>` : "";
+  const glyphDefs = registry.defsHtml();
+  const allDefParts = [...defParts, glyphDefs].filter(s => s.length > 0);
+  const filterDef = allDefParts.length > 0 ? `<defs>${allDefParts.join("")}</defs>` : "";
   const filterAttr = useShadow ? ` filter="url(#ds)"` : "";
 
   const strokeAttrs =
@@ -429,8 +520,8 @@ export function buildVerticalSvgFromFont(
       ? ` stroke="${xmlEscape(opts.stroke)}" stroke-width="${opts.strokeWidth}" stroke-linejoin="round" paint-order="stroke fill"`
       : "";
 
-  // 全 path を共通の塗り/縁取り/影属性つきの <g> でまとめる
-  const textLayer = `<g fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}>${pathParts.join("\n")}</g>`;
+  // 全 use を共通の塗り/縁取り/影属性つきの <g> でまとめる
+  const textLayer = `<g fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}>${useEls.join("")}</g>`;
 
   const inner = `${filterDef}${bgShape}\n${textLayer}`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);

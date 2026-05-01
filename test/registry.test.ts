@@ -45,6 +45,12 @@ describe("computeKey", () => {
     const b = parsePath("/font-Roboto/vertical/Hello.svg")!;
     expect(await computeKey(a)).not.toBe(await computeKey(b));
   });
+
+  it("wrap フラグ違いは別ハッシュ", async () => {
+    const a = parsePath("/font-Roboto/Hello.svg")!;
+    const b = parsePath("/font-Roboto/wrap/Hello.svg")!;
+    expect(await computeKey(a)).not.toBe(await computeKey(b));
+  });
 });
 
 describe("r2Key", () => {

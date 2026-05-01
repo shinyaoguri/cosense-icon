@@ -8,6 +8,7 @@ import {
   currentFontValue,
   isMathMode,
   isVerticalMode,
+  isWrapMode,
 } from "./state";
 import { showToast } from "./toast";
 
@@ -52,7 +53,7 @@ export async function renderPathifyPreview(): Promise<void> {
       const lines = text.split(/\r?\n/);
       svg = verticalOn
         ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
-        : buildSvgFromFont(font, lines, collectIconOpts());
+        : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
     }
     if (reqId !== _previewReqId) return;
     const blob = new Blob([svg], { type: "image/svg+xml" });

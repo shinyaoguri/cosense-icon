@@ -26,6 +26,10 @@ export interface OpenTypeFont {
   ascender?: number;
   descender?: number;
   charToGlyph?(ch: string): OpenTypeGlyph;
+  // GSUB shaping 後のグリフ列を返す (liga 等が適用済み、kern は GPOS なので別途)
+  stringToGlyphs?(text: string): OpenTypeGlyph[];
+  // 隣接グリフペアのカーニング値 (font units)。GPOS テーブルから取得。
+  getKerningValue?(left: OpenTypeGlyph, right: OpenTypeGlyph): number;
   glyphs?: { get(index: number): OpenTypeGlyph };
   substitution?: OpenTypeSubstitution;
   tables?: {

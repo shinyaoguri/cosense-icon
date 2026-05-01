@@ -1495,6 +1495,17 @@ input[type=range]::-moz-range-thumb {
   border-color: var(--accent);
   color: var(--accent);
 }
+.wrap-btn .wrap-btn-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.wrap-btn[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 /* 絵文字トリガ: 既存のスタイル踏襲 */
 .emoji-trigger .emoji-trigger-icon {
   font-size: 1.05rem;
@@ -2221,6 +2232,9 @@ footer a:hover { color: var(--accent); }
       <div class="text-input-wrap">
         <textarea id="text" placeholder="Type... / 入力..."></textarea>
         <div class="text-tools">
+          <button type="button" id="wrapBtn" class="text-tool-btn wrap-btn" title="幅に応じて自動改行" aria-label="自動改行モード切替" aria-pressed="false">
+            <span class="wrap-btn-icon" aria-hidden="true">↵</span>
+          </button>
           <button type="button" id="verticalBtn" class="text-tool-btn vertical-btn" title="縦書きモード" aria-label="縦書きモード切替" aria-pressed="false">
             <span class="vertical-btn-icon" aria-hidden="true">縦</span>
           </button>
@@ -2233,6 +2247,7 @@ footer a:hover { color: var(--accent); }
         </div>
         <input type="checkbox" id="math" hidden>
         <input type="checkbox" id="vertical" hidden>
+        <input type="checkbox" id="wrap" hidden>
       </div>
     </div>
     <div id="emojiPanel" class="emoji-panel" hidden role="dialog" aria-label="絵文字を選択">

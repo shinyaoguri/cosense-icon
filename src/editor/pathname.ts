@@ -193,8 +193,10 @@ export function applyPathname(pathname: string): void {
 
   // /math/ または /tex/ セグメントの有無で数式モードを切替
   // /vertical/ /tate/ /v/ セグメントの有無で縦書きモードを切替
+  // /wrap/ セグメントの有無で自動改行モードを切替
   let math = false;
   let vertical = false;
+  let wrap = false;
   segs.slice(0, -1).forEach(seg => {
     const segLower = seg.toLowerCase();
     if (segLower === "math" || segLower === "tex") {
@@ -203,6 +205,10 @@ export function applyPathname(pathname: string): void {
     }
     if (segLower === "vertical" || segLower === "tate" || segLower === "v") {
       vertical = true;
+      return;
+    }
+    if (segLower === "wrap") {
+      wrap = true;
       return;
     }
     if (segLower === "random") return; // 既存処理は別 (random はサーバ判定だけで OK)
@@ -224,4 +230,8 @@ export function applyPathname(pathname: string): void {
   if (vertInp) vertInp.checked = vertical;
   const vertBtn = document.getElementById("verticalBtn");
   if (vertBtn) vertBtn.setAttribute("aria-pressed", String(vertical));
+  const wrapInp = document.getElementById("wrap") as HTMLInputElement | null;
+  if (wrapInp) wrapInp.checked = wrap;
+  const wrapBtn = document.getElementById("wrapBtn");
+  if (wrapBtn) wrapBtn.setAttribute("aria-pressed", String(wrap));
 }

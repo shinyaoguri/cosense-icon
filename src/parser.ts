@@ -30,6 +30,8 @@ export type ParsedPath = {
   math: boolean;
   /** /vertical/ /tate/ /v/ セグメントがパスに含まれる場合に true。縦書きでレンダリング */
   vertical: boolean;
+  /** /wrap/ セグメントがパスに含まれる場合に true。長い文字列を幅に応じて自動改行 */
+  wrap: boolean;
   explicit: Set<keyof IconOptions>;
   rawFontValue?: string;
 };
@@ -372,6 +374,7 @@ export function parsePath(pathname: string): ParsedPath | null {
   let random = false;
   let math = false;
   let vertical = false;
+  let wrap = false;
 
   for (const seg of optionSegments) {
     const segLower = seg.toLowerCase();
@@ -385,6 +388,10 @@ export function parsePath(pathname: string): ParsedPath | null {
     }
     if (segLower === "vertical" || segLower === "tate" || segLower === "v") {
       vertical = true;
+      continue;
+    }
+    if (segLower === "wrap") {
+      wrap = true;
       continue;
     }
     for (const token of seg.split(",")) {
@@ -402,6 +409,7 @@ export function parsePath(pathname: string): ParsedPath | null {
     random,
     math,
     vertical,
+    wrap,
     explicit,
     rawFontValue: state.rawFontValue,
   };

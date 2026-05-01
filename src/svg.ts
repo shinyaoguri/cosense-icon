@@ -1,4 +1,10 @@
 import type { IconOptions } from "./parser";
+import { fitFontSizeWithWrap, wrapLines as wrapAllLines } from "./textwrap";
+
+// サーバ側はフォント実測ができないので CJK ≈ 1em / ラテン ≈ 0.55em の概算
+function estimateCharWidth(ch: string): number {
+  return /[\x00-\x7F]/.test(ch) ? 0.55 : 1.0;
+}
 
 export function escapeXml(s: string): string {
   return s
@@ -44,12 +50,31 @@ export function rotationWrap(
   return { outerW: width, outerH: height, transform: null };
 }
 
-export function renderSvg(lines: string[], opts: IconOptions): string {
+export function renderSvg(
+  lines: string[],
+  opts: IconOptions,
+  wrap = false,
+): string {
   const { width, height, bg, fg, padding, radius, fontFamily, fontWeight, align } = opts;
   const innerW = Math.max(1, width - padding * 2);
   const innerH = Math.max(1, height - padding * 2);
   const lineHeight = opts.lineHeight;
-  const fontSize = opts.fontSize ?? estimateFontSize(lines, innerW, innerH, lineHeight);
+
+  // wrap モード: 幅に合わせて自動改行 + fontSize 反復縮小
+  let renderLines = lines;
+  let fontSize: number;
+  if (wrap) {
+    if (opts.fontSize) {
+      fontSize = opts.fontSize;
+      renderLines = wrapAllLines(lines, innerW / fontSize, estimateCharWidth);
+    } else {
+      const fit = fitFontSizeWithWrap(lines, innerW, innerH, lineHeight, estimateCharWidth);
+      fontSize = fit.fontSize;
+      renderLines = fit.wrappedLines;
+    }
+  } else {
+    fontSize = opts.fontSize ?? estimateFontSize(lines, innerW, innerH, lineHeight);
+  }
 
   const isJustify = align === "justify";
   const anchor =
@@ -65,10 +90,10 @@ export function renderSvg(lines: string[], opts: IconOptions): string {
       ? width - padding
       : width / 2;
 
-  const totalTextHeight = fontSize * lineHeight * lines.length;
+  const totalTextHeight = fontSize * lineHeight * renderLines.length;
   const startY = (height - totalTextHeight) / 2 + fontSize * lineHeight * 0.8;
 
-  const tspans = lines
+  const tspans = renderLines
     .map((line, i) => {
       const dy = i === 0 ? 0 : fontSize * lineHeight;
       // 両端揃え: 2文字以上ある行のみ innerW いっぱいに spacing 引き伸ばし

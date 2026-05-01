@@ -34,7 +34,7 @@ const IMMUTABLE_CACHE_CONTROL =
   "public, max-age=31536000, immutable";
 const SVG_CONTENT_TYPE = "image/svg+xml; charset=utf-8";
 
-const MAX_REGISTER_BYTES = 200_000;
+const MAX_REGISTER_BYTES = 2_000_000;
 
 const UA_MODERN_CHROME =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -338,7 +338,7 @@ async function handleIcon(
     // クリックすると /?regen=base64(...) → エディタが開いて自動で登録フローが走る。
     const baseSvg = parsed.vertical
       ? renderVerticalSvg(parsed.text, parsed.options)
-      : renderSvg(parsed.text, parsed.options);
+      : renderSvg(parsed.text, parsed.options, parsed.wrap);
     const regen = url.origin + buildRegenUrl(url.pathname);
     const withChip = withErrorMarker(
       baseSvg,
@@ -357,7 +357,7 @@ async function handleIcon(
 
   const baseSvg = parsed.vertical
     ? renderVerticalSvg(parsed.text, parsed.options)
-    : renderSvg(parsed.text, parsed.options);
+    : renderSvg(parsed.text, parsed.options, parsed.wrap);
   const svg = withEditorLink(baseSvg, editorUrl);
   const response = new Response(svg, {
     headers: {

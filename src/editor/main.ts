@@ -37,6 +37,7 @@ import {
   currentFontValue,
   isMathMode,
   isVerticalMode,
+  isWrapMode,
 } from "./state";
 import { setupTurnstileWidget } from "./turnstile";
 
@@ -411,6 +412,9 @@ function resetForm(): void {
   $input("vertical").checked = false;
   const verticalBtn = document.getElementById("verticalBtn");
   if (verticalBtn) verticalBtn.setAttribute("aria-pressed", "false");
+  $input("wrap").checked = false;
+  const wrapBtn = document.getElementById("wrapBtn");
+  if (wrapBtn) wrapBtn.setAttribute("aria-pressed", "false");
   $input("gradColor").value = "#7c3aed";
   ($input("gradColorHex") as HTMLInputElement).value = "#7c3aed";
   $input("gradAngle").value = "135";
@@ -633,6 +637,19 @@ $("verticalBtn").addEventListener("click", () => {
   update();
 });
 
+// 自動改行モードトグル
+$("wrapBtn").addEventListener("click", () => {
+  const inp = $input("wrap");
+  inp.checked = !inp.checked;
+  $("wrapBtn").setAttribute("aria-pressed", String(inp.checked));
+  if (inp.checked) {
+    showToast("自動改行 ON: 幅に合わせて折り返します", "success", 1800);
+  } else {
+    showToast("自動改行 OFF", "info", 1200);
+  }
+  update();
+});
+
 // キーボードショートカット
 document.addEventListener("keydown", e => {
   // テキスト入力中はショートカットを無視 (テキスト編集を妨げない)
@@ -731,7 +748,7 @@ async function getCurrentSvgText(): Promise<string> {
     const lines = text.split(/\r?\n/);
     return isVerticalMode()
       ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
-      : buildSvgFromFont(font, lines, collectIconOpts());
+      : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
   }
   // それ以外は Worker から取得
   const res = await fetch(build());

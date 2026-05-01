@@ -8,6 +8,7 @@ import {
   currentFontValue,
   isMathMode,
   isVerticalMode,
+  isWrapMode,
 } from "./state";
 import { getTurnstileToken } from "./turnstile";
 
@@ -46,7 +47,7 @@ export async function registerCurrentPath(onProgress?: ProgressCb): Promise<void
     onProgress?.("Path 化中...");
     svg = isVerticalMode()
       ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
-      : buildSvgFromFont(font, lines, collectIconOpts());
+      : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
   }
 
   onProgress?.("認証中...");

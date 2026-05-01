@@ -65,3 +65,51 @@ describe("renderVerticalSvg", () => {
     expect(svg).toContain("#fff");
   });
 });
+
+describe("renderSvg (wrap モード)", () => {
+  it("wrap=false なら 1 行のまま (現状維持)", () => {
+    const parsed = parsePath(
+      "/" + encodeURIComponent("これは長い文章です。改行されません。") + ".svg",
+    )!;
+    const svg = renderSvg(parsed.text, parsed.options, false);
+    expect((svg.match(/<tspan /g) ?? []).length).toBe(1);
+  });
+
+  it("wrap=true で長い CJK 文章は複数行に分割される", () => {
+    const longText =
+      "これは大変長い文章でして自動改行機能を試すためのものです。長い文章を入れた時に幅に応じて適切に改行されるかどうかを確認します。";
+    const parsed = parsePath("/" + encodeURIComponent(longText) + ".svg")!;
+    const svg = renderSvg(parsed.text, parsed.options, true);
+    const lineCount = (svg.match(/<tspan /g) ?? []).length;
+    expect(lineCount).toBeGreaterThan(1);
+  });
+
+  it("wrap=true でも短い文章は 1 行", () => {
+    const parsed = parsePath("/Hello.svg")!;
+    const svg = renderSvg(parsed.text, parsed.options, true);
+    expect((svg.match(/<tspan /g) ?? []).length).toBe(1);
+  });
+
+  it("wrap=true ラテン語は単語境界で改行", () => {
+    const longText = "This is a fairly long English sentence that should wrap nicely at word boundaries.";
+    const parsed = parsePath("/" + encodeURIComponent(longText) + ".svg")!;
+    const svg = renderSvg(parsed.text, parsed.options, true);
+    // 単語が途中で切れていないことを確認 (\w が tspan 末尾にあるべきだが、
+    // これは厳密ではないので緩く: tspan の中身が空白で始まっていない)
+    const tspanContents = [...svg.matchAll(/<tspan [^>]*>([^<]*)<\/tspan>/g)].map(
+      m => m[1]!,
+    );
+    expect(tspanContents.length).toBeGreaterThan(1);
+    for (const c of tspanContents) {
+      expect(c.startsWith(" ")).toBe(false);
+      expect(c.endsWith(" ")).toBe(false);
+    }
+  });
+
+  it("wrap=true: 明示 size 指定でも幅に応じて改行する", () => {
+    const longText = "これは大変長い文章でして自動改行機能を試すためのものです。";
+    const parsed = parsePath("/size-40/" + encodeURIComponent(longText) + ".svg")!;
+    const svg = renderSvg(parsed.text, parsed.options, true);
+    expect((svg.match(/<tspan /g) ?? []).length).toBeGreaterThan(1);
+  });
+});

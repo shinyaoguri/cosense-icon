@@ -37,6 +37,7 @@ function normalizedKeyParts(parsed: ParsedPath): string {
     `grad=${o.gradTo ?? ""}-${o.gradAngle ?? 135}`,
     `math=${parsed.math ? "1" : "0"}`,
     `vertical=${parsed.vertical ? "1" : "0"}`,
+    `wrap=${parsed.wrap ? "1" : "0"}`,
   ].join("|");
 }
 

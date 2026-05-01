@@ -188,6 +188,29 @@ describe("parsePath", () => {
     const r = parsePath("/VERTICAL/x.svg")!;
     expect(r.vertical).toBe(true);
   });
+
+  it("wrap セグメントを検出する", () => {
+    const r = parsePath("/wrap/長い文章.svg")!;
+    expect(r.wrap).toBe(true);
+    expect(r.text.join("")).toBe("長い文章");
+  });
+
+  it("wrap 指定がなければ wrap=false", () => {
+    const r = parsePath("/Hello.svg")!;
+    expect(r.wrap).toBe(false);
+  });
+
+  it("wrap セグメントは大文字小文字を区別しない", () => {
+    const r = parsePath("/WRAP/x.svg")!;
+    expect(r.wrap).toBe(true);
+  });
+
+  it("wrap は他オプションと並列に並べられる", () => {
+    const r = parsePath("/bg-fff/wrap/fg-000/text.svg")!;
+    expect(r.wrap).toBe(true);
+    expect(r.options.bg).toBe("#fff");
+    expect(r.options.fg).toBe("#000");
+  });
 });
 
 describe("isGoogleFontCandidate", () => {

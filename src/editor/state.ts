@@ -106,6 +106,11 @@ export function isVerticalMode(): boolean {
   return !!inp?.checked;
 }
 
+export function isWrapMode(): boolean {
+  const inp = document.getElementById("wrap") as HTMLInputElement | null;
+  return !!inp?.checked;
+}
+
 export function build(): string {
   const opts: string[] = [];
   const bg = $input("bg").value.toLowerCase();
@@ -159,6 +164,9 @@ export function build(): string {
   // 縦書きモード: 同様に /vertical/ セグメントを挿入
   const vertInp = document.getElementById("vertical") as HTMLInputElement | null;
   if (vertInp?.checked) opts.push("vertical");
+  // 自動改行モード: /wrap/
+  const wrapInp = document.getElementById("wrap") as HTMLInputElement | null;
+  if (wrapInp?.checked) opts.push("wrap");
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {
