@@ -1496,9 +1496,9 @@ input[type=range]::-moz-range-thumb {
   color: var(--accent);
 }
 .wrap-btn .wrap-btn-icon {
-  font-size: 1.15rem;
-  line-height: 1;
-  font-weight: 700;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
 }
 .wrap-btn[aria-pressed="true"] {
   opacity: 1;
@@ -2233,7 +2233,12 @@ footer a:hover { color: var(--accent); }
         <textarea id="text" placeholder="Type... / 入力..."></textarea>
         <div class="text-tools">
           <button type="button" id="wrapBtn" class="text-tool-btn wrap-btn" title="幅に応じて自動改行" aria-label="自動改行モード切替" aria-pressed="false">
-            <span class="wrap-btn-icon" aria-hidden="true">↵</span>
+            <svg class="wrap-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M3 12h15a3 3 0 0 1 0 6h-4"/>
+              <polyline points="16 16 14 18 16 20"/>
+              <line x1="3" y1="18" x2="10" y2="18"/>
+            </svg>
           </button>
           <button type="button" id="verticalBtn" class="text-tool-btn vertical-btn" title="縦書きモード" aria-label="縦書きモード切替" aria-pressed="false">
             <span class="vertical-btn-icon" aria-hidden="true">縦</span>
