@@ -337,7 +337,7 @@ async function handleIcon(
     // R2 未登録: chip マーカーを内部に挿入してから、外側を「自動再登録 URL」でラップ。
     // クリックすると /?regen=base64(...) → エディタが開いて自動で登録フローが走る。
     const baseSvg = parsed.vertical
-      ? renderVerticalSvg(parsed.text, parsed.options)
+      ? renderVerticalSvg(parsed.text, parsed.options, parsed.wrap)
       : renderSvg(parsed.text, parsed.options, parsed.wrap);
     const regen = url.origin + buildRegenUrl(url.pathname);
     const withChip = withErrorMarker(
@@ -356,7 +356,7 @@ async function handleIcon(
   }
 
   const baseSvg = parsed.vertical
-    ? renderVerticalSvg(parsed.text, parsed.options)
+    ? renderVerticalSvg(parsed.text, parsed.options, parsed.wrap)
     : renderSvg(parsed.text, parsed.options, parsed.wrap);
   const svg = withEditorLink(baseSvg, editorUrl);
   const response = new Response(svg, {

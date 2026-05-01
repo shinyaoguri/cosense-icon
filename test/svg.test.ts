@@ -113,3 +113,28 @@ describe("renderSvg (wrap モード)", () => {
     expect((svg.match(/<tspan /g) ?? []).length).toBeGreaterThan(1);
   });
 });
+
+describe("renderVerticalSvg (wrap モード)", () => {
+  it("wrap=false なら 1 行 = 1 列", () => {
+    const longText = "これは長い縦書きの文章ですが折り返しません。";
+    const parsed = parsePath("/vertical/" + encodeURIComponent(longText) + ".svg")!;
+    const svg = renderVerticalSvg(parsed.text, parsed.options, false);
+    expect((svg.match(/<text /g) ?? []).length).toBe(1);
+  });
+
+  it("wrap=true で長い縦書き文章は複数列に分割される", () => {
+    const longText =
+      "これは大変長い縦書きの文章でして自動改行を試すためのものです。長い文章を縦書き wrap で表示するとどうなるかを確認します。";
+    const parsed = parsePath("/vertical/" + encodeURIComponent(longText) + ".svg")!;
+    const svg = renderVerticalSvg(parsed.text, parsed.options, true);
+    const colCount = (svg.match(/<text /g) ?? []).length;
+    expect(colCount).toBeGreaterThan(1);
+  });
+
+  it("wrap=true: 入力の \\n は強制列区切りとして保持", () => {
+    const parsed = parsePath("/vertical/" + encodeURIComponent("AAA\\nBBB") + ".svg")!;
+    const svg = renderVerticalSvg(parsed.text, parsed.options, true);
+    // 短文 2 行 → wrap しても 2 列のまま
+    expect((svg.match(/<text /g) ?? []).length).toBe(2);
+  });
+});

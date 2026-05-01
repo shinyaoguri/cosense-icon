@@ -71,6 +71,98 @@ function getVertSubMap(font: OpenTypeFont): Map<number, number> {
   return map;
 }
 
+// 縦書き wrap: VerticalCell の配列をトークン単位 (CJK/TCY/空白/ラテン語) で列に分割
+interface VCellToken {
+  cells: VerticalCell[];
+  cellCount: number;
+  isSpace: boolean;
+}
+
+function tokenizeVerticalCells(cells: VerticalCell[]): VCellToken[] {
+  const tokens: VCellToken[] = [];
+  let buf: VerticalCell[] = [];
+
+  const flush = (): void => {
+    if (buf.length > 0) {
+      tokens.push({ cells: buf, cellCount: buf.length, isSpace: false });
+      buf = [];
+    }
+  };
+
+  for (const cell of cells) {
+    if (cell.type === "rotate") {
+      if (/\s/.test(cell.ch)) {
+        flush();
+        tokens.push({ cells: [cell], cellCount: 1, isSpace: true });
+      } else {
+        // ラテン・記号は連続して 1 単語化 (atomic)
+        buf.push(cell);
+      }
+    } else {
+      // CJK / TCY: 個別トークン
+      flush();
+      tokens.push({ cells: [cell], cellCount: 1, isSpace: false });
+    }
+  }
+  flush();
+  return tokens;
+}
+
+function isSpaceCell(cell: VerticalCell): boolean {
+  return cell.type === "rotate" && /\s/.test(cell.ch);
+}
+
+function wrapVerticalCells(
+  cells: VerticalCell[],
+  maxCells: number,
+): VerticalCell[][] {
+  if (cells.length === 0) return [];
+  if (maxCells <= 0) return [cells];
+
+  const tokens = tokenizeVerticalCells(cells);
+  const cols: VerticalCell[][] = [];
+  let buf: VerticalCell[] = [];
+
+  const stripTrailingSpace = (arr: VerticalCell[]): void => {
+    while (arr.length > 0 && isSpaceCell(arr[arr.length - 1]!)) arr.pop();
+  };
+
+  for (const tok of tokens) {
+    if (tok.cellCount > maxCells && !tok.isSpace) {
+      if (buf.length > 0) {
+        stripTrailingSpace(buf);
+        if (buf.length > 0) cols.push(buf);
+        buf = [];
+      }
+      // ラテン語 (rotate run) を maxCells ごとに強制分割
+      let chunk: VerticalCell[] = [];
+      for (const c of tok.cells) {
+        if (chunk.length >= maxCells) {
+          cols.push(chunk);
+          chunk = [];
+        }
+        chunk.push(c);
+      }
+      buf = chunk;
+      continue;
+    }
+
+    if (buf.length + tok.cellCount > maxCells && buf.length > 0) {
+      stripTrailingSpace(buf);
+      if (buf.length > 0) cols.push(buf);
+      buf = tok.isSpace ? [] : [...tok.cells];
+    } else {
+      if (tok.isSpace && buf.length === 0) continue;
+      buf.push(...tok.cells);
+    }
+  }
+  if (buf.length > 0) {
+    stripTrailingSpace(buf);
+    if (buf.length > 0) cols.push(buf);
+  }
+  return cols;
+}
+
 // グリフ index → defs 内 id のレジスタ。<use> で参照される。
 // 同じ字が繰り返し出現するほど削減効果が大きい (CJK 文章で 30〜60%)
 class GlyphRegistry {
@@ -352,6 +444,7 @@ export function buildVerticalSvgFromFont(
   font: OpenTypeFont,
   lines: string[],
   opts: IconOpts,
+  wrap = false,
 ): string {
   const { width, height, padding, bg, fg, radius, align, lh } = opts;
   const innerW = Math.max(1, width - padding * 2);
@@ -361,24 +454,70 @@ export function buildVerticalSvgFromFont(
 
   const vertSubMap = getVertSubMap(font);
 
-  // 各列のセル列を事前に分割
-  const colCells = lines.map(chunkVertical);
-  const maxCells = colCells.reduce((m, cs) => Math.max(m, cs.length), 0);
-  const nCols = Math.max(1, lines.length);
+  // 各入力行をセル列に分割
+  const lineCells = lines.map(chunkVertical);
 
-  // 自動サイズ: 高さ方向 (セル数) と横方向 (列数 × lineHeight) の両制約
+  // 出力用の列配列。wrap モードでは入力行をさらに分割する。
+  let colCells: VerticalCell[][];
   let fontSize: number;
-  if (opts.size) {
-    fontSize = opts.size;
+
+  if (wrap) {
+    if (opts.size) {
+      fontSize = opts.size;
+      const maxCellsPerCol = Math.max(1, Math.floor(innerH / fontSize));
+      colCells = [];
+      for (const cs of lineCells) {
+        const split = wrapVerticalCells(cs, maxCellsPerCol);
+        if (split.length === 0) colCells.push([]);
+        else colCells.push(...split);
+      }
+    } else {
+      // 自動サイズ: √(innerW × innerH / (totalCells × lh)) で初期推定
+      const totalCells = lineCells.reduce((s, cs) => s + cs.length, 0) || 1;
+      fontSize = Math.sqrt((innerW * innerH) / (totalCells * lh));
+      fontSize = Math.min(fontSize, innerH);
+      fontSize = Math.max(8, fontSize);
+
+      const wrapAt = (fs: number): VerticalCell[][] => {
+        const max = Math.max(1, Math.floor(innerH / fs));
+        const out: VerticalCell[][] = [];
+        for (const cs of lineCells) {
+          const split = wrapVerticalCells(cs, max);
+          if (split.length === 0) out.push([]);
+          else out.push(...split);
+        }
+        return out;
+      };
+
+      colCells = wrapAt(fontSize);
+      for (let it = 0; it < 8; it++) {
+        const totalW = colCells.length * fontSize * lh;
+        if (totalW <= innerW) break;
+        fontSize *= 0.92;
+        if (fontSize < 8) {
+          fontSize = 8;
+          colCells = wrapAt(fontSize);
+          break;
+        }
+        colCells = wrapAt(fontSize);
+      }
+    }
   } else {
-    fontSize = Math.max(
-      8,
-      Math.min(
-        innerH / Math.max(1, maxCells),
-        innerW / Math.max(1, nCols * lh),
-      ),
-    );
+    colCells = lineCells;
+    const maxCells = colCells.reduce((m, cs) => Math.max(m, cs.length), 0);
+    if (opts.size) {
+      fontSize = opts.size;
+    } else {
+      fontSize = Math.max(
+        8,
+        Math.min(
+          innerH / Math.max(1, maxCells),
+          innerW / Math.max(1, colCells.length * lh),
+        ),
+      );
+    }
   }
+  const nCols = Math.max(1, colCells.length);
 
   const colWidth = fontSize * lh;
   const totalColsW = nCols * colWidth;
@@ -399,7 +538,7 @@ export function buildVerticalSvgFromFont(
   // group ごとの transform で位置決めし、内部に <use> を並べる。
   // (TCY は CJK と同じ fontSize の glyph を使うが、scaleX で潰す)
 
-  for (let ci = 0; ci < lines.length; ci++) {
+  for (let ci = 0; ci < colCells.length; ci++) {
     const cells = colCells[ci]!;
     const colCenterX = rightCenterX - ci * colWidth;
 

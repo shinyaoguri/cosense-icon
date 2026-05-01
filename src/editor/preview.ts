@@ -52,7 +52,7 @@ export async function renderPathifyPreview(): Promise<void> {
       if (reqId !== _previewReqId) return;
       const lines = text.split(/\r?\n/);
       svg = verticalOn
-        ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+        ? buildVerticalSvgFromFont(font, lines, collectIconOpts(), isWrapMode())
         : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
     }
     if (reqId !== _previewReqId) return;

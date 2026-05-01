@@ -747,7 +747,7 @@ async function getCurrentSvgText(): Promise<string> {
     const font = await ensureFont(family, $select("weight").value, text);
     const lines = text.split(/\r?\n/);
     return isVerticalMode()
-      ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+      ? buildVerticalSvgFromFont(font, lines, collectIconOpts(), isWrapMode())
       : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
   }
   // それ以外は Worker から取得

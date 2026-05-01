@@ -1,5 +1,11 @@
 import type { IconOptions } from "./parser";
-import { fitFontSizeWithWrap, wrapLines as wrapAllLines } from "./textwrap";
+import {
+  countVerticalCells,
+  fitFontSizeWithWrap,
+  fitVerticalFontSizeWithWrap,
+  wrapLines as wrapAllLines,
+  wrapVerticalLines,
+} from "./textwrap";
 
 // サーバ側はフォント実測ができないので CJK ≈ 1em / ラテン ≈ 0.55em の概算
 function estimateCharWidth(ch: string): number {
@@ -192,45 +198,40 @@ function buildVerticalRuns(line: string): string {
   return out.join("");
 }
 
-// 縦書き用に列内のセル数を概算 (TCY 1 グループ = 1 セル)
-function countVerticalCells(line: string): number {
-  let count = 0;
-  let i = 0;
-  while (i < line.length) {
-    const ch = line[i]!;
-    if (/[0-9]/.test(ch)) {
-      let j = i;
-      while (j < line.length && /[0-9]/.test(line[j]!)) j++;
-      const run = line.slice(i, j);
-      // TCY (<= 2 桁) は 1 セル、それ以外は文字数分
-      count += run.length <= 2 ? 1 : run.length;
-      i = j;
-    } else {
-      count += 1;
-      i++;
-    }
-  }
-  return count;
-}
-
-export function renderVerticalSvg(lines: string[], opts: IconOptions): string {
+export function renderVerticalSvg(
+  lines: string[],
+  opts: IconOptions,
+  wrap = false,
+): string {
   const { width, height, bg, fg, padding, radius, fontFamily, fontWeight, align } = opts;
   const innerW = Math.max(1, width - padding * 2);
   const innerH = Math.max(1, height - padding * 2);
   const lineHeight = opts.lineHeight;
 
-  // 1 列内の最大セル数 (高さ方向)
-  const maxCells = lines.reduce((m, l) => Math.max(m, countVerticalCells(l)), 0);
-  const nCols = Math.max(1, lines.length);
-
-  // 自動サイズ: 列幅 (横方向) と列高 (縦方向) の両制約を満たす
-  const fontSize = opts.fontSize ?? Math.max(
-    8,
-    Math.min(
-      innerH / Math.max(1, maxCells),
-      innerW / Math.max(1, nCols * lineHeight),
-    ),
-  );
+  // wrap モード: 縦書きでは「列高 = innerH/fontSize」を超えたら左に新列。
+  let renderLines = lines;
+  let fontSize: number;
+  if (wrap) {
+    if (opts.fontSize) {
+      fontSize = opts.fontSize;
+      const maxCells = Math.max(1, Math.floor(innerH / fontSize));
+      renderLines = wrapVerticalLines(lines, maxCells);
+    } else {
+      const fit = fitVerticalFontSizeWithWrap(lines, innerW, innerH, lineHeight);
+      fontSize = fit.fontSize;
+      renderLines = fit.columns;
+    }
+  } else {
+    const maxCells = lines.reduce((m, l) => Math.max(m, countVerticalCells(l)), 0);
+    fontSize = opts.fontSize ?? Math.max(
+      8,
+      Math.min(
+        innerH / Math.max(1, maxCells),
+        innerW / Math.max(1, lines.length * lineHeight),
+      ),
+    );
+  }
+  const nCols = Math.max(1, renderLines.length);
 
   const colWidth = fontSize * lineHeight;
   const totalColsW = nCols * colWidth;
@@ -307,7 +308,7 @@ export function renderVerticalSvg(lines: string[], opts: IconOptions): string {
   // 各列を独立した <text> として配置
   const writingStyle = "writing-mode:vertical-rl;text-orientation:mixed";
 
-  const textEls = lines
+  const textEls = renderLines
     .map((line, i) => {
       const colX = rightCenterX - i * colWidth;
       const content = buildVerticalRuns(line);

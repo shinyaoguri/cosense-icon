@@ -46,7 +46,7 @@ export async function registerCurrentPath(onProgress?: ProgressCb): Promise<void
 
     onProgress?.("Path 化中...");
     svg = isVerticalMode()
-      ? buildVerticalSvgFromFont(font, lines, collectIconOpts())
+      ? buildVerticalSvgFromFont(font, lines, collectIconOpts(), isWrapMode())
       : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
   }
 
