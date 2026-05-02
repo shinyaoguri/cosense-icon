@@ -315,6 +315,67 @@ function rotationWrap(
   return { outerW: width, outerH: height, transform: null };
 }
 
+// 多くの Google Fonts は絵文字グリフを持たないため、line 全体を path 化すると
+// .notdef (豆腐) になる。絵文字クラスタは <text> として残し、閲覧 OS の
+// カラー絵文字フォントに描画させる。
+const EMOJI_FONT_STACK =
+  '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+
+interface LineSegment {
+  kind: "text" | "emoji";
+  value: string;
+  width: number;
+}
+
+function isEmojiCluster(s: string): boolean {
+  return /\p{Extended_Pictographic}/u.test(s);
+}
+
+function segmentLine(
+  line: string,
+  font: OpenTypeFont,
+  fontSize: number,
+): LineSegment[] {
+  if (line === "") return [];
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const out: LineSegment[] = [];
+  let curKind: "text" | "emoji" | null = null;
+  let curBuf = "";
+  let curEmojiCount = 0;
+  const flush = (): void => {
+    if (curKind === null || curBuf === "") return;
+    if (curKind === "text") {
+      out.push({
+        kind: "text",
+        value: curBuf,
+        width: font.getAdvanceWidth(curBuf, fontSize),
+      });
+    } else {
+      // 絵文字は概ね 1em 幅。getAdvanceWidth は .notdef を返してしまうので使わない。
+      out.push({
+        kind: "emoji",
+        value: curBuf,
+        width: curEmojiCount * fontSize,
+      });
+    }
+    curBuf = "";
+    curEmojiCount = 0;
+  };
+  for (const { segment } of segmenter.segment(line)) {
+    const k: "text" | "emoji" = isEmojiCluster(segment) ? "emoji" : "text";
+    if (curKind !== null && k !== curKind) flush();
+    curKind = k;
+    curBuf += segment;
+    if (k === "emoji") curEmojiCount++;
+  }
+  flush();
+  return out;
+}
+
+function lineWidthOf(segs: LineSegment[]): number {
+  return segs.reduce((sum, s) => sum + s.width, 0);
+}
+
 export function buildSvgFromFont(
   font: OpenTypeFont,
   lines: string[],
@@ -345,7 +406,7 @@ export function buildSvgFromFont(
   } else {
     const probe = 100;
     const longest = lines.reduce((max, line) => {
-      const w = font.getAdvanceWidth(line, probe);
+      const w = lineWidthOf(segmentLine(line, font, probe));
       return Math.max(max, w);
     }, 0);
     const maxByWidth = longest > 0 ? (innerW / longest) * probe : innerH;
@@ -359,34 +420,49 @@ export function buildSvgFromFont(
   const upe = font.unitsPerEm ?? 1000;
   const registry = new GlyphRegistry(font, fontSize);
   const useEls: string[] = [];
+  const emojiEls: string[] = [];
+  const emojiFontAttr =
+    ` font-family="${xmlEscape(EMOJI_FONT_STACK)}" font-size="${fontSize}"`;
 
   for (let i = 0; i < renderLines.length; i++) {
     const line = renderLines[i]!;
     const y = startY + i * fontSize * lh;
-    const lineWidth = font.getAdvanceWidth(line, fontSize);
+    const segs = segmentLine(line, font, fontSize);
+    if (segs.length === 0) continue;
+    const totalLineWidth = lineWidthOf(segs);
     let x: number;
     if (align === "left") x = padding;
-    else if (align === "right") x = width - padding - lineWidth;
-    else x = (width - lineWidth) / 2;
+    else if (align === "right") x = width - padding - totalLineWidth;
+    else x = (width - totalLineWidth) / 2;
 
-    // GSUB shaping (liga 等) を適用したグリフ列
-    const shaped = font.stringToGlyphs?.(line);
-    if (!shaped || shaped.length === 0) continue;
-
-    let cursorX = x;
     const unit = fontSize / upe;
-    for (let gi = 0; gi < shaped.length; gi++) {
-      const glyph = shaped[gi]!;
-      // GPOS kern (Latin で重要、CJK ではほぼ 0)
-      if (gi > 0 && font.getKerningValue) {
-        const kern = font.getKerningValue(shaped[gi - 1]!, glyph) ?? 0;
-        cursorX += kern * unit;
+    for (const seg of segs) {
+      if (seg.kind === "text") {
+        // GSUB shaping (liga 等) を適用したグリフ列
+        const shaped = font.stringToGlyphs?.(seg.value);
+        if (shaped && shaped.length > 0) {
+          let cursorX = x;
+          for (let gi = 0; gi < shaped.length; gi++) {
+            const glyph = shaped[gi]!;
+            // GPOS kern (Latin で重要、CJK ではほぼ 0)
+            if (gi > 0 && font.getKerningValue) {
+              const kern = font.getKerningValue(shaped[gi - 1]!, glyph) ?? 0;
+              cursorX += kern * unit;
+            }
+            const id = registry.register(glyph);
+            useEls.push(
+              `<use href="#${id}" x="${cursorX.toFixed(1)}" y="${y.toFixed(1)}"/>`,
+            );
+            cursorX += (glyph.advanceWidth ?? upe) * unit;
+          }
+        }
+      } else {
+        // 絵文字は閲覧 OS のカラー絵文字フォント任せ。<text> として残す。
+        emojiEls.push(
+          `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}"${emojiFontAttr}>${xmlEscape(seg.value)}</text>`,
+        );
       }
-      const id = registry.register(glyph);
-      useEls.push(
-        `<use href="#${id}" x="${cursorX.toFixed(1)}" y="${y.toFixed(1)}"/>`,
-      );
-      cursorX += (glyph.advanceWidth ?? upe) * unit;
+      x += seg.width;
     }
   }
 
@@ -427,8 +503,10 @@ export function buildSvgFromFont(
     opts.stroke && (opts.strokeWidth ?? 0) > 0
       ? ` stroke="${xmlEscape(opts.stroke)}" stroke-width="${opts.strokeWidth}" stroke-linejoin="round" paint-order="stroke fill"`
       : "";
-  // <use> は単一の親 <g> でまとめて塗り/縁取り/影属性を共有 (1 字ごとに付けるとサイズ膨張)
-  const textLayer = `<g fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}>${useEls.join("")}</g>`;
+  // <use> は単一の親 <g> でまとめて塗り/縁取り/影属性を共有 (1 字ごとに付けるとサイズ膨張)。
+  // 絵文字 <text> も同じ <g> に入れ、fill / shadow を継承させる
+  // (color emoji は fill を無視するが、monochrome フォールバック時は fg が効く)
+  const textLayer = `<g fill="${xmlEscape(fg)}"${strokeAttrs}${filterAttr}>${useEls.join("")}${emojiEls.join("")}</g>`;
 
   const inner = `${filterDef}${bgShape}\n${textLayer}`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
