@@ -12,6 +12,18 @@ function estimateCharWidth(ch: string): number {
   return /[\x00-\x7F]/.test(ch) ? 0.55 : 1.0;
 }
 
+// 多くのテキストフォント (とりわけ Google Fonts や mono 系) は絵文字グリフを持たない。
+// フォントを変更しても絵文字だけは閲覧 OS のカラー絵文字フォントに描画させたいので、
+// font-family スタックの末尾にカラー絵文字フォントを足しておく。
+// 文字ごとのフォントフォールバックにより、選択フォントが絵文字グリフを持たない場合だけ
+// ここに落ちる (欧文・記号・©®™ などは手前の generic ファミリが先に拾う)。
+const EMOJI_FONT_FALLBACK =
+  '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+
+function fontFamilyWithEmoji(fontFamily: string): string {
+  return `${fontFamily}, ${EMOJI_FONT_FALLBACK}`;
+}
+
 export function escapeXml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -158,7 +170,7 @@ export function renderSvg(
       : "";
 
   const inner = `${filterDef}${bgShape}
-<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}${strokeAttrs}${filterAttr}>${tspans}</text>`;
+<text x="${textX}" y="${startY}" fill="${escapeXml(fg)}" font-family="${escapeXml(fontFamilyWithEmoji(fontFamily))}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" text-anchor="${anchor}"${letterSpacingAttr}${strokeAttrs}${filterAttr}>${tspans}</text>`;
   const { outerW, outerH, transform } = rotationWrap(width, height, opts.rotate ?? 0);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
 
@@ -312,7 +324,7 @@ export function renderVerticalSvg(
     .map((line, i) => {
       const colX = rightCenterX - i * colWidth;
       const content = buildVerticalRuns(line);
-      return `<text x="${colX}" y="${columnY}" style="${writingStyle}" font-family="${escapeXml(fontFamily)}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" fill="${escapeXml(fg)}" text-anchor="${textAnchor}"${letterSpacingAttr}${strokeAttrs}${filterAttr}>${content}</text>`;
+      return `<text x="${colX}" y="${columnY}" style="${writingStyle}" font-family="${escapeXml(fontFamilyWithEmoji(fontFamily))}" font-weight="${escapeXml(fontWeight)}" font-size="${fontSize}" fill="${escapeXml(fg)}" text-anchor="${textAnchor}"${letterSpacingAttr}${strokeAttrs}${filterAttr}>${content}</text>`;
     })
     .join("\n");
 
