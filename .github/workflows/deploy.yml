@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -21,8 +22,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # 本番と同じ minify ビルドを通し、埋め込み崩れ等をデプロイ前に検出
+      - run: npm run build:editor
 
   deploy:
+    # PR では test のみ実行し、main への push のときだけデプロイする
+    if: github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     environment: production
