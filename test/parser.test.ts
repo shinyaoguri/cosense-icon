@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isGoogleFontCandidate, parsePath, parseText } from "../src/parser";
+import {
+  isGoogleFontCandidate,
+  parseIsoDate,
+  parsePath,
+  parseText,
+  substituteCountToken,
+} from "../src/parser";
 
 describe("parseText", () => {
   it("\\n を改行として扱う", () => {
@@ -210,6 +216,73 @@ describe("parsePath", () => {
     expect(r.wrap).toBe(true);
     expect(r.options.bg).toBe("#fff");
     expect(r.options.fg).toBe("#000");
+  });
+});
+
+describe("countdown / countup", () => {
+  it("countdown / countup フラグを検出", () => {
+    expect(parsePath("/countdown/x.svg")!.countdown).toBe(true);
+    expect(parsePath("/countdown/x.svg")!.countup).toBe(false);
+    expect(parsePath("/countup/x.svg")!.countup).toBe(true);
+    expect(parsePath("/x.svg")!.countdown).toBe(false);
+  });
+
+  it("大文字小文字を区別しない", () => {
+    expect(parsePath("/COUNTDOWN/x.svg")!.countdown).toBe(true);
+  });
+
+  it("date オプションと他オプションを並列に指定できる", () => {
+    const r = parsePath("/bg-fff/countdown/date-2026-12-31/あと{d}日.svg")!;
+    expect(r.countdown).toBe(true);
+    expect(r.options.date).toBe("2026-12-31");
+    expect(r.options.bg).toBe("#fff");
+    expect(r.text).toEqual(["あと{d}日"]);
+  });
+
+  it("date のエイリアス (target / 基準日)", () => {
+    expect(parsePath("/target-2026-01-01/x.svg")!.options.date).toBe(
+      "2026-01-01",
+    );
+    expect(parsePath("/基準日-2026-01-01/x.svg")!.options.date).toBe(
+      "2026-01-01",
+    );
+  });
+
+  it("不正な date は無視される", () => {
+    expect(parsePath("/date-2026-13-01/x.svg")!.options.date).toBeUndefined();
+    expect(parsePath("/date-2026-02-30/x.svg")!.options.date).toBeUndefined();
+    expect(parsePath("/date-hello/x.svg")!.options.date).toBeUndefined();
+  });
+});
+
+describe("parseIsoDate", () => {
+  it("実在日を正規化して返す", () => {
+    expect(parseIsoDate("2026-12-31")).toBe("2026-12-31");
+    expect(parseIsoDate(" 2028-02-29 ")).toBe("2028-02-29"); // 2028 は閏年
+  });
+  it("不正な日付は null", () => {
+    expect(parseIsoDate("2026-13-01")).toBeNull();
+    expect(parseIsoDate("2026-04-31")).toBeNull();
+    expect(parseIsoDate("2026-02-29")).toBeNull(); // 平年の2/29
+    expect(parseIsoDate("2026/12/31")).toBeNull();
+    expect(parseIsoDate("hello")).toBeNull();
+  });
+});
+
+describe("substituteCountToken", () => {
+  it("{d} を数値へ置換", () => {
+    expect(substituteCountToken(["あと{d}日"], 5)).toEqual(["あと5日"]);
+  });
+  it("{} / {n} / {days} も置換、複数出現も全て", () => {
+    expect(substituteCountToken(["{}日 ({n})"], 3)).toEqual(["3日 (3)"]);
+    expect(substituteCountToken(["{days}"], 7)).toEqual(["7"]);
+  });
+  it("複数行にまたがって置換", () => {
+    expect(substituteCountToken(["残り", "{d}日"], 12)).toEqual(["残り", "12日"]);
+  });
+  it("プレースホルダが無ければ末尾行に付加", () => {
+    expect(substituteCountToken(["締切"], 9)).toEqual(["締切 9"]);
+    expect(substituteCountToken([""], 9)).toEqual(["9"]);
   });
 });
 

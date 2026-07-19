@@ -55,6 +55,9 @@ const KEY_ALIASES: Record<string, string> = {
   to: "grad",
   angle: "gradAngle",
   "grad-angle": "gradAngle",
+  date: "date",
+  target: "date",
+  "基準日": "date",
 };
 
 function applySingleOpt(k: string, v: string): void {
@@ -153,6 +156,14 @@ function applySingleOpt(k: string, v: string): void {
       if (Number.isFinite(n)) $input("gradAngle").value = String(n);
       return;
     }
+    case "date": {
+      // "YYYY-MM-DD" のみ受け付け、input[type=date] へ設定
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        const inp = document.getElementById("countDate") as HTMLInputElement | null;
+        if (inp) inp.value = v;
+      }
+      return;
+    }
     case "font": {
       const low = v.toLowerCase();
       if ((BUILTIN_FONTS as readonly string[]).includes(low)) {
@@ -197,6 +208,7 @@ export function applyPathname(pathname: string): void {
   let math = false;
   let vertical = false;
   let wrap = false;
+  let countMode: "countdown" | "countup" | null = null;
   segs.slice(0, -1).forEach(seg => {
     const segLower = seg.toLowerCase();
     if (segLower === "math" || segLower === "tex") {
@@ -209,6 +221,10 @@ export function applyPathname(pathname: string): void {
     }
     if (segLower === "wrap") {
       wrap = true;
+      return;
+    }
+    if (segLower === "countdown" || segLower === "countup") {
+      countMode = segLower;
       return;
     }
     if (segLower === "random") return; // 既存処理は別 (random はサーバ判定だけで OK)
@@ -234,4 +250,14 @@ export function applyPathname(pathname: string): void {
   if (wrapInp) wrapInp.checked = wrap;
   const wrapBtn = document.getElementById("wrapBtn");
   if (wrapBtn) wrapBtn.setAttribute("aria-pressed", String(wrap));
+  const countInp = document.getElementById("count") as HTMLInputElement | null;
+  if (countInp) countInp.checked = countMode !== null;
+  const countBtn = document.getElementById("countBtn");
+  if (countBtn) countBtn.setAttribute("aria-pressed", String(countMode !== null));
+  const countField = document.getElementById("countField");
+  if (countField) countField.hidden = countMode === null;
+  if (countMode) {
+    const modeSel = document.getElementById("countMode") as HTMLSelectElement | null;
+    if (modeSel) modeSel.value = countMode;
+  }
 }

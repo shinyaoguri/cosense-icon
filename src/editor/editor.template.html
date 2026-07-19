@@ -1506,6 +1506,44 @@ input[type=range]::-moz-range-thumb {
   border-color: var(--accent);
   color: var(--accent);
 }
+.count-btn .count-btn-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+.count-btn[aria-pressed="true"] {
+  opacity: 1;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.count-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.count-field[hidden] { display: none; }
+.count-field select,
+.count-field input[type="date"] {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.count-field .count-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.count-field .count-hint code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+}
 /* 絵文字トリガ: 既存のスタイル踏襲 */
 .emoji-trigger .emoji-trigger-icon {
   font-size: 1.05rem;
@@ -2246,6 +2284,9 @@ footer a:hover { color: var(--accent); }
           <button type="button" id="mathBtn" class="text-tool-btn math-btn" title="数式モード (TeX / LaTeX)" aria-label="数式モード切替" aria-pressed="false">
             <span class="math-btn-icon" aria-hidden="true">∑</span>
           </button>
+          <button type="button" id="countBtn" class="text-tool-btn count-btn" title="カウントダウン / カウントアップ (基準日までの残り・経過日数を {d} に埋め込む)" aria-label="カウントダウン/アップ切替" aria-pressed="false">
+            <span class="count-btn-icon" aria-hidden="true">📅</span>
+          </button>
           <button type="button" id="emojiBtn" class="text-tool-btn emoji-trigger" title="絵文字を挿入" aria-label="絵文字を挿入" aria-expanded="false">
             <span class="emoji-trigger-icon" aria-hidden="true">😀</span>
           </button>
@@ -2253,6 +2294,15 @@ footer a:hover { color: var(--accent); }
         <input type="checkbox" id="math" hidden>
         <input type="checkbox" id="vertical" hidden>
         <input type="checkbox" id="wrap" hidden>
+        <input type="checkbox" id="count" hidden>
+      </div>
+      <div id="countField" class="count-field" hidden>
+        <select id="countMode" aria-label="カウント種別">
+          <option value="countdown">カウントダウン (あと)</option>
+          <option value="countup">カウントアップ (経過)</option>
+        </select>
+        <input type="date" id="countDate" aria-label="基準日">
+        <span class="count-hint">テキストの <code>{d}</code> が日数に置換されます</span>
       </div>
     </div>
     <div id="emojiPanel" class="emoji-panel" hidden role="dialog" aria-label="絵文字を選択">

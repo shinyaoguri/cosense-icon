@@ -20,6 +20,7 @@ export type IconOptions = {
   gradTo?: string; // 設定されていればグラデ背景 (bg → gradTo)
   gradAngle: number; // 角度 (deg)。デフォ 135
   timezone?: string;
+  date?: string; // countdown/countup の基準日 (検証済み "YYYY-MM-DD")
 };
 
 export type ParsedPath = {
@@ -32,6 +33,10 @@ export type ParsedPath = {
   vertical: boolean;
   /** /wrap/ セグメントがパスに含まれる場合に true。長い文字列を幅に応じて自動改行 */
   wrap: boolean;
+  /** /countdown/ セグメントがパスに含まれる場合に true。基準日までの残り日数を埋め込む */
+  countdown: boolean;
+  /** /countup/ セグメントがパスに含まれる場合に true。基準日からの経過日数を埋め込む */
+  countup: boolean;
   explicit: Set<keyof IconOptions>;
   rawFontValue?: string;
 };
@@ -97,6 +102,9 @@ const KEY_ALIASES: Record<string, keyof IconOptions> = {
   tz: "timezone",
   timezone: "timezone",
   "タイムゾーン": "timezone",
+  date: "date",
+  target: "date",
+  "基準日": "date",
 };
 
 const FONT_STACKS: Record<string, string> = {
@@ -257,6 +265,14 @@ function applyOption(
       explicit.add("timezone");
       return;
     }
+    case "date": {
+      const v = parseIsoDate(rawValue);
+      if (v) {
+        opts.date = v;
+        explicit.add("date");
+      }
+      return;
+    }
     case "align": {
       const a = parseAlign(rawValue);
       if (a) {
@@ -357,6 +373,43 @@ export function parseText(raw: string): string[] {
   return normalized.split(/\n/);
 }
 
+// "YYYY-MM-DD" を検証し、実在日なら正規化した文字列を返す。不正なら null。
+export function parseIsoDate(raw: string): string | null {
+  const v = raw.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  // 月ごとの日数で実在日か確認 (2/30 等を弾く)
+  const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  if (d > dim) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
+// countdown/countup 用: text 中のプレースホルダ ({d} / {} / {n} / {days}) を日数へ置換。
+// プレースホルダが 1 つも無ければ、末尾の行に数値をスペース区切りで付加する。
+const COUNT_TOKEN = /\{(?:d|n|days)?\}/g;
+
+export function substituteCountToken(text: string[], n: number): string[] {
+  const num = String(n);
+  let matched = false;
+  const replaced = text.map((line) =>
+    line.replace(COUNT_TOKEN, () => {
+      matched = true;
+      return num;
+    }),
+  );
+  if (matched) return replaced;
+  // フォールバック: プレースホルダが無い場合は末尾行に付加
+  const out = [...replaced];
+  const lastIdx = out.length - 1;
+  const last = out[lastIdx] ?? "";
+  out[lastIdx] = last ? `${last} ${num}` : num;
+  return out;
+}
+
 export function parsePath(pathname: string): ParsedPath | null {
   const trimmed = pathname.replace(/^\/+/, "");
   if (!trimmed) return null;
@@ -375,6 +428,8 @@ export function parsePath(pathname: string): ParsedPath | null {
   let math = false;
   let vertical = false;
   let wrap = false;
+  let countdown = false;
+  let countup = false;
 
   for (const seg of optionSegments) {
     const segLower = seg.toLowerCase();
@@ -394,6 +449,14 @@ export function parsePath(pathname: string): ParsedPath | null {
       wrap = true;
       continue;
     }
+    if (segLower === "countdown") {
+      countdown = true;
+      continue;
+    }
+    if (segLower === "countup") {
+      countup = true;
+      continue;
+    }
     for (const token of seg.split(",")) {
       const pair = splitFirst(token, KV_SEPARATORS);
       if (!pair) continue;
@@ -410,6 +473,8 @@ export function parsePath(pathname: string): ParsedPath | null {
     math,
     vertical,
     wrap,
+    countdown,
+    countup,
     explicit,
     rawFontValue: state.rawFontValue,
   };

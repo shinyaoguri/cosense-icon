@@ -1,10 +1,16 @@
 import {
+  computeDayCount,
   isDynamicKeyword,
   renderDynamicSvg,
   resolveTimezone,
 } from "./dynamic";
 import editorHtml from "./editor.html";
-import { isGoogleFontCandidate, parsePath, type ParsedPath } from "./parser";
+import {
+  isGoogleFontCandidate,
+  parsePath,
+  substituteCountToken,
+  type ParsedPath,
+} from "./parser";
 import { deterministicPalette } from "./random";
 import {
   buildRegenUrl,
@@ -293,6 +299,31 @@ async function handleIcon(
     const tz = resolveTimezone(parsed.options.timezone, cfTz);
     applyRandomPalette(parsed);
     const svg = renderDynamicSvg(dynamic, new Date(), tz, parsed.options);
+    return new Response(svg, {
+      headers: {
+        "content-type": SVG_CONTENT_TYPE,
+        ...NO_STORE_HEADERS,
+      },
+    });
+  }
+
+  // countdown / countup: 基準日までの残り or 経過日数をテキストのプレースホルダへ埋め込む。
+  // today 同様アクセス時点で計算し no-store で返す (R2 / Cache API は通さない)。
+  if (parsed.countdown || parsed.countup) {
+    const cfTz = (request as unknown as { cf?: { timezone?: string } }).cf
+      ?.timezone;
+    const tz = resolveTimezone(parsed.options.timezone, cfTz);
+    const n = computeDayCount(
+      parsed.countdown ? "down" : "up",
+      parsed.options.date,
+      new Date(),
+      tz,
+    );
+    const text = substituteCountToken(parsed.text, n);
+    applyRandomPalette(parsed);
+    const svg = parsed.vertical
+      ? renderVerticalSvg(text, parsed.options, parsed.wrap)
+      : renderSvg(text, parsed.options, parsed.wrap);
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,
