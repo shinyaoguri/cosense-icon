@@ -207,16 +207,31 @@ Worker が以下を配信する。
 ```bash
 npm install
 npm run dev               # ローカル http://localhost:8787 (build:editor:dev も同時実行)
-npm test                  # parser / svg / dynamic / registry テスト
+npm test                  # parser / svg / dynamic / registry / random + editor ビルド検証
 npm run typecheck         # ルート + tsconfig.editor.json の両方
 npm run build:editor      # 本番用 (minify) で src/editor.html を生成
 npm run build:editor:dev  # dev 用 (sourcemap, no minify)
 npm run deploy            # Cloudflare に手動デプロイ (通常は GitHub Actions)
 ```
 
+### エディタビルドの検証 (dev/prod 差異の事故防止)
+
+エディタ JS は [editor.template.html](src/editor/editor.template.html) の `<!-- BUNDLE -->` に
+inline 展開される。この埋め込みで **minify 版だけ壊れる** 事故 (String.replace の `$&` 等の
+特殊置換パターンで JS が改変され SyntaxError) が起きうるため、[test/editor-build.test.ts](test/editor-build.test.ts)
+が `npm test` の中で **dev / prod 両ビルド**を実行し、次を検証する:
+
+- 埋め込み後の inline script が JS として構文的に有効 (`new Function` で parse)
+- bundle が HTML に**逐語的に**埋め込まれている (改変されていない)
+
+`npm run dev` は非 minify なので、この事故はローカルの目視だけでは見逃しやすい。テストと
+CI で **本番と同じ minify ビルド**を必ず通すことで、デプロイ前に検出する。
+
 ## 自動デプロイ
 
-`main` ブランチへの push で `.github/workflows/deploy.yml` が走り、テスト後に Cloudflare へデプロイする。
+`.github/workflows/deploy.yml` の `test` job は **PR と `main` への push の両方**で走り
+(typecheck → test → 本番 minify ビルド)、`deploy` job は `main` への push のときだけ実行される。
+つまり壊れたビルドは PR の時点で CI が検出し、`main` にマージされるまでデプロイされない。
 
 ### 事前設定
 
@@ -264,9 +279,11 @@ src/
 
 scripts/
 └─ build-editor.mjs   esbuild で main.ts をバンドル → editor.html
+                      (buildEditorHtml をエクスポートしテストと共有)
 
 test/
-└─ *.test.ts          parser / svg / dynamic / registry / random
+├─ *.test.ts          parser / svg / dynamic / registry / random
+└─ editor-build.test.ts  dev/prod 両ビルドの inline 構文 + 埋め込み忠実性を検証
 ```
 
 ## ライセンス
