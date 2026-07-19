@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { IconOptions } from "../src/parser";
 import {
+  computeDayCount,
   isDynamicKeyword,
   renderMonthSvg,
   renderTodaySvg,
@@ -60,6 +61,34 @@ describe("resolveTimezone", () => {
   it("両方なし or 不正はデフォルト", () => {
     expect(resolveTimezone(undefined, undefined)).toBe("Asia/Tokyo");
     expect(resolveTimezone("Not/Real", "Bad/Zone")).toBe("Asia/Tokyo");
+  });
+});
+
+describe("computeDayCount", () => {
+  // BASE = 2026-04-19 JST が「今日」
+  it("countdown: 基準日前は残り日数、当日は0、超過は0で下げ止め", () => {
+    expect(computeDayCount("down", "2026-04-20", BASE, TZ)).toBe(1);
+    expect(computeDayCount("down", "2026-04-29", BASE, TZ)).toBe(10);
+    expect(computeDayCount("down", "2026-04-19", BASE, TZ)).toBe(0); // 当日
+    expect(computeDayCount("down", "2026-04-18", BASE, TZ)).toBe(0); // 超過 → 0
+  });
+  it("countup: 基準日後は経過日数、当日は0、基準日前は0で下げ止め", () => {
+    expect(computeDayCount("up", "2026-04-18", BASE, TZ)).toBe(1);
+    expect(computeDayCount("up", "2026-04-01", BASE, TZ)).toBe(18);
+    expect(computeDayCount("up", "2026-04-19", BASE, TZ)).toBe(0); // 当日
+    expect(computeDayCount("up", "2026-04-20", BASE, TZ)).toBe(0); // 未来 → 0
+  });
+  it("date 未指定/不正は0", () => {
+    expect(computeDayCount("down", undefined, BASE, TZ)).toBe(0);
+    expect(computeDayCount("down", "not-a-date", BASE, TZ)).toBe(0);
+    expect(computeDayCount("up", undefined, BASE, TZ)).toBe(0);
+  });
+  it("tz で当日判定が変わる (UTC では既に翌日)", () => {
+    // BASE = 2026-04-19T03:00Z。UTC では 4/19、JST では 4/19。
+    // 2026-04-19T22:00Z は UTC 4/19 だが JST 4/20。
+    const late = new Date("2026-04-19T22:00:00Z");
+    expect(computeDayCount("down", "2026-04-20", late, "UTC")).toBe(1);
+    expect(computeDayCount("down", "2026-04-20", late, "Asia/Tokyo")).toBe(0);
   });
 });
 

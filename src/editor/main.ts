@@ -415,6 +415,13 @@ function resetForm(): void {
   $input("wrap").checked = false;
   const wrapBtn = document.getElementById("wrapBtn");
   if (wrapBtn) wrapBtn.setAttribute("aria-pressed", "false");
+  $input("count").checked = false;
+  const countBtnReset = document.getElementById("countBtn");
+  if (countBtnReset) countBtnReset.setAttribute("aria-pressed", "false");
+  const countFieldReset = document.getElementById("countField");
+  if (countFieldReset) countFieldReset.hidden = true;
+  $input("countDate").value = "";
+  $select("countMode").value = "countdown";
   $input("gradColor").value = "#7c3aed";
   ($input("gradColorHex") as HTMLInputElement).value = "#7c3aed";
   $input("gradAngle").value = "135";
@@ -649,6 +656,30 @@ $("wrapBtn").addEventListener("click", () => {
   }
   update();
 });
+
+// カウントダウン/アップ トグル
+const COUNT_TOKEN_RE = /\{(?:d|n|days)?\}/;
+$("countBtn").addEventListener("click", () => {
+  const inp = $input("count");
+  inp.checked = !inp.checked;
+  $("countBtn").setAttribute("aria-pressed", String(inp.checked));
+  const field = $("countField");
+  field.hidden = !inp.checked;
+  if (inp.checked) {
+    // プレースホルダが無ければ入力欄に {d} を補って使い方を示す
+    const ta = $textarea("text");
+    if (!COUNT_TOKEN_RE.test(ta.value)) {
+      ta.value = ta.value ? ta.value + "{d}" : "あと{d}日";
+    }
+    showToast("カウント ON: 基準日を選び、{d} を日数に置換します", "success", 2200);
+  } else {
+    showToast("カウント OFF", "info", 1200);
+  }
+  update();
+});
+// 種別・基準日の変更でプレビュー更新
+$select("countMode").addEventListener("change", () => update());
+$input("countDate").addEventListener("change", () => update());
 
 // キーボードショートカット
 document.addEventListener("keydown", e => {

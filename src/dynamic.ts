@@ -38,6 +38,28 @@ export function resolveTimezone(
   return DEFAULT_TZ;
 }
 
+// countdown/countup の日数計算。
+// tz における「今日」と基準日 (isoDate="YYYY-MM-DD") を日単位で比較する。
+//   - kind="down": 基準日まで残り日数 = max(0, target - today)
+//   - kind="up":   基準日からの経過日数 = max(0, today - target)
+// 当日は両方 0。基準日を超過した countdown / 基準日前の countup は 0 で下げ止め。
+// isoDate 未指定/不正時は 0。
+export function computeDayCount(
+  kind: "down" | "up",
+  isoDate: string | undefined,
+  now: Date,
+  tz: string,
+): number {
+  if (!isoDate) return 0;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!m) return 0;
+  const targetUtc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const { y, m: mo, d } = tzParts(now, tz);
+  const todayUtc = Date.UTC(y, mo - 1, d);
+  const diffDays = Math.round((targetUtc - todayUtc) / 86_400_000);
+  return kind === "down" ? Math.max(0, diffDays) : Math.max(0, -diffDays);
+}
+
 const WEEKDAYS_JA = ["月", "火", "水", "木", "金", "土", "日"];
 
 type TzDate = {

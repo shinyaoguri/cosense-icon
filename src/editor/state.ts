@@ -167,6 +167,14 @@ export function build(): string {
   // 自動改行モード: /wrap/
   const wrapInp = document.getElementById("wrap") as HTMLInputElement | null;
   if (wrapInp?.checked) opts.push("wrap");
+  // カウントダウン/アップ: /countdown/ or /countup/ + date-<基準日>
+  const countInp = document.getElementById("count") as HTMLInputElement | null;
+  if (countInp?.checked) {
+    const mode = $select("countMode").value; // "countdown" | "countup"
+    opts.push(mode === "countup" ? "countup" : "countdown");
+    const dv = $input("countDate").value;
+    if (dv) opts.push("date-" + dv);
+  }
 
   const fontSel = $select("font").value;
   if (fontSel === "custom") {
