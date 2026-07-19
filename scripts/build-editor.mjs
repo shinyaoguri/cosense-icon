@@ -32,10 +32,19 @@ if (!outFile) throw new Error("esbuild produced no output");
 // HTML に inline 展開するので、bundle 内の </script> を無害化
 const js = outFile.text.replace(/<\/script>/gi, "<\\/script>");
 
-const html = readFileSync(template, "utf-8").replace(
-  "<!-- BUNDLE -->",
-  `<script>${js}</script>`,
-);
+// 置換値は関数で渡す。文字列で渡すと bundle 内の `$&` `$$` 等が
+// String.replace の特殊置換パターンとして解釈され JS が壊れる。
+const template_ = readFileSync(template, "utf-8");
+if (!template_.includes("<!-- BUNDLE -->")) {
+  throw new Error("template に <!-- BUNDLE --> プレースホルダが見つからない");
+}
+const html = template_.replace("<!-- BUNDLE -->", () => `<script>${js}</script>`);
+
+// 埋め込みガード: bundle が逐語的に含まれていること (再発防止)。
+// 特殊置換パターン等で JS が改変されると inline が壊れて全体が動かなくなるため。
+if (!html.includes(`<script>${js}</script>`)) {
+  throw new Error("bundle が HTML に逐語的に埋め込まれていない (置換で改変された可能性)");
+}
 
 writeFileSync(out, html);
 
