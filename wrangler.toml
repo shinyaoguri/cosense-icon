@@ -12,6 +12,13 @@ zone_name = "soui.dev"
 [observability]
 enabled = true
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+
 [[r2_buckets]]
 binding = "ICON_PATHS"
 bucket_name = "cosense-icon-paths"
