@@ -1,3 +1,4 @@
+import type { IconOpts } from "../pathrender";
 import { $input, $select, $textarea } from "./dom";
 
 export interface Defaults {
@@ -45,25 +46,8 @@ export const initial: InitialValues = {
   fontCustom: "",
 };
 
-export interface IconOpts {
-  width: number;
-  height: number;
-  padding: number;
-  radius: number;
-  lh: number;
-  bg: string;
-  fg: string;
-  align: "left" | "center" | "right" | "justify";
-  size: number | null;
-  rotate: 0 | 90 | 180 | 270;
-  shadow?: string;
-  shadowBlur?: number;
-  shadowColor?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  gradTo?: string;
-  gradAngle?: number;
-}
+// 組版側と共有する型なので正本は src/pathrender.ts。従来どおりここから import できる。
+export type { IconOpts } from "../pathrender";
 
 export function collectIconOpts(): IconOpts {
   const r = (+$input("rotate").value || 0) as IconOpts["rotate"];
