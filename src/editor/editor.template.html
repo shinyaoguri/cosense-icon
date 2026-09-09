@@ -1356,6 +1356,20 @@ input[type=range]::-moz-range-thumb {
 .custom-font { margin-top: 0.25rem; display: none; }
 .custom-font.show { display: flex; }
 
+/* フィールド下の注意書き (組み合わせが効かないことの説明など) */
+.field-note {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-md);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.field-note.warn {
+  color: var(--warn);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: var(--warn-soft);
+}
+
 /* インフォメーションのアイコン (hover でツールチップ) */
 .info-tip {
   display: none;
@@ -2394,6 +2408,7 @@ footer a:hover { color: var(--accent); }
       <label></label>
       <input type="text" id="fontCustom" placeholder="例: Impact / 'Comic Sans MS' / Futura">
     </div>
+    <p class="field-note warn" id="fontLiveWarn" hidden>内容がアクセスのたびに変わるアイコン (カウントダウン / カウントアップ / today・week・month・year) では Google Fonts を適用できません。閲覧側のシステムフォントで描画され、右下に警告マークが付きます。</p>
     <div class="field"><label>字サイズ</label>
       <input type="checkbox" id="sizeAuto" checked>
       <span style="color:#94a3b8;font-size:.75rem;flex:none;">自動</span>

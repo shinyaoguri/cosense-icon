@@ -1,47 +1,14 @@
-export interface OpenTypePath {
-  toPathData(decimalPlaces?: number): string;
-  toSVG(decimalPlaces?: number): string;
-}
+// 組版が使うフォントのインターフェースは Worker 側とも共有するため src/fonttypes.ts が正本。
+// エディタ側のモジュールは従来どおりここから import できるよう re-export する。
+export type {
+  OpenTypeFont,
+  OpenTypeGlobal,
+  OpenTypeGlyph,
+  OpenTypePath,
+  OpenTypeSubstitution,
+} from "../fonttypes";
 
-export interface OpenTypeGlyph {
-  index: number;
-  advanceWidth?: number;
-  getPath(x: number, y: number, fontSize: number): OpenTypePath;
-}
-
-export interface OpenTypeSubstitution {
-  // 単一置換 (Single Substitution, GSUB Lookup Type 1) を取得
-  // フォントが該当 feature を持たない場合は null/undefined または空配列
-  getSingle(
-    feature: string,
-    script?: string,
-    language?: string,
-  ): { sub: number; by: number }[] | null | undefined;
-}
-
-export interface OpenTypeFont {
-  getPath(text: string, x: number, y: number, fontSize: number): OpenTypePath;
-  getAdvanceWidth(text: string, fontSize: number): number;
-  unitsPerEm?: number;
-  ascender?: number;
-  descender?: number;
-  charToGlyph?(ch: string): OpenTypeGlyph;
-  // GSUB shaping 後のグリフ列を返す (liga 等が適用済み、kern は GPOS なので別途)
-  stringToGlyphs?(text: string): OpenTypeGlyph[];
-  // 隣接グリフペアのカーニング値 (font units)。GPOS テーブルから取得。
-  getKerningValue?(left: OpenTypeGlyph, right: OpenTypeGlyph): number;
-  glyphs?: { get(index: number): OpenTypeGlyph };
-  substitution?: OpenTypeSubstitution;
-  tables?: {
-    vmtx?: { advanceHeights?: number[]; topSideBearings?: number[] };
-    vhea?: { ascent?: number; descent?: number };
-    [key: string]: unknown;
-  };
-}
-
-export interface OpenTypeGlobal {
-  parse(buffer: ArrayBuffer): OpenTypeFont;
-}
+import type { OpenTypeGlobal } from "../fonttypes";
 
 export interface TurnstileGlobal {
   render(selector: string | HTMLElement, options: Record<string, unknown>): string;

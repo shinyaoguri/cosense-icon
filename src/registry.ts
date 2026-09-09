@@ -1,4 +1,4 @@
-import type { ParsedPath } from "./parser";
+import { isGoogleFontCandidate, type ParsedPath } from "./parser";
 
 export interface RegistryEnv {
   ICON_PATHS: R2Bucket;
@@ -86,16 +86,28 @@ export function withEditorLink(svg: string, editorUrl: string): string {
     .replace(/<\/svg>/, `</a></svg>`);
 }
 
+export interface ErrorMarkerText {
+  /** chip に載せるラベル (幅が足りないときは ! だけの button になる) */
+  label: string;
+  /** ホバー時の <title> */
+  tooltip: string;
+}
+
+export const REGEN_MARKER: ErrorMarkerText = {
+  label: "エディタで再生成",
+  tooltip:
+    "Google Fonts の登録待ちのためフォールバック表示中です。" +
+    "クリックでエディタを開き、再生成してください。",
+};
+
 export function withErrorMarker(
   svg: string,
   width: number,
   height: number,
   regenUrl: string,
+  text: ErrorMarkerText = REGEN_MARKER,
 ): string {
-  const tooltip =
-    "Google Fonts の登録待ちのためフォールバック表示中です。" +
-    "クリックでエディタを開き、再生成してください。";
-  const tip = escapeXmlAttr(tooltip);
+  const tip = escapeXmlAttr(text.tooltip);
 
   // CSS-in-SVG: chip はクリック対象ではなく視覚的な警告のみ。
   // クリックは外側 `withEditorLink` の <a> が担う。
@@ -108,19 +120,26 @@ export function withErrorMarker(
     `.ic-warn-text{fill:#3a1605;font-family:-apple-system,system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;font-weight:600;font-size:12px;dominant-baseline:central}` +
     `</style>`;
 
+  // chip 幅はラベル長から決める (font-size 12px。CJK は 1em、ラテンは約 0.58em)
+  const labelW = Array.from(text.label).reduce(
+    (w, ch) => w + (/[　-鿿＀-￯]/.test(ch) ? 12 : 7),
+    0,
+  );
+  const chipW = Math.round(labelW + 58);
+
   // 横幅に応じてラベル付き chip / コンパクト button を切替
-  const useChip = width >= 176 && height >= 56;
+  const useChip = width >= chipW + 22 && height >= 56;
   let marker: string;
   if (useChip) {
-    // chip 寸法: 154 × 32, 角丸 16
+    // chip 寸法: chipW × 32, 角丸 16
     const x = width - 8;
     const y = height - 8;
     marker =
       `<g class="ic-warn" transform="translate(${x} ${y})">` +
-      `<rect x="-154" y="-32" width="154" height="32" rx="16" class="ic-warn-chip"/>` +
-      `<circle cx="-131" cy="-16" r="11" class="ic-warn-mark-bg"/>` +
-      `<text x="-131" y="-16" text-anchor="middle" class="ic-warn-mark">!</text>` +
-      `<text x="-112" y="-16" class="ic-warn-text">エディタで再生成</text>` +
+      `<rect x="-${chipW}" y="-32" width="${chipW}" height="32" rx="16" class="ic-warn-chip"/>` +
+      `<circle cx="-${chipW - 23}" cy="-16" r="11" class="ic-warn-mark-bg"/>` +
+      `<text x="-${chipW - 23}" y="-16" text-anchor="middle" class="ic-warn-mark">!</text>` +
+      `<text x="-${chipW - 42}" y="-16" class="ic-warn-text">${escapeXmlAttr(text.label)}</text>` +
       `<title>${tip}</title>` +
       `</g>`;
   } else {
@@ -142,6 +161,38 @@ export function withErrorMarker(
     `<?xml version="1.0" encoding="UTF-8"?>\n${comment}`,
   );
   return withComment.replace("</svg>", `${style}${marker}\n</svg>`);
+}
+
+// Google Fonts はエディタが Path 化した SVG を R2 から引く仕組みなので、内容が
+// アクセスのたびに変わるパス (countdown / countup / 動的キーワード) では効かず、
+// 閲覧側のシステムフォントに落ちる。黙って落ちると気付けないので警告チップを付け、
+// クリックでエディタ (理由を表示する) へ飛ばす。
+export const FONT_UNSUPPORTED_MARKER: ErrorMarkerText = {
+  label: "フォント未反映",
+  tooltip:
+    "内容が毎回変わるアイコン (countdown / countup / today など) では " +
+    "Google Fonts を適用できず、システムフォントで描画しています。" +
+    "クリックでエディタを開きます。",
+};
+
+/**
+ * Google Fonts を指定しているのに適用できないパスへ警告チップを付ける。
+ * システムフォント指定 (sans / serif 等) や font 未指定なら何もしない。
+ */
+export function markUnsupportedFont(
+  svg: string,
+  parsed: ParsedPath,
+  editorUrl: string,
+): string {
+  if (!isGoogleFontCandidate(parsed.rawFontValue)) return svg;
+  const withChip = withErrorMarker(
+    svg,
+    parsed.options.width,
+    parsed.options.height,
+    editorUrl,
+    FONT_UNSUPPORTED_MARKER,
+  );
+  return withEditorLink(withChip, editorUrl);
 }
 
 const DANGEROUS_TAGS =

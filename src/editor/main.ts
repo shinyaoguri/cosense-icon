@@ -30,11 +30,12 @@ import {
   savePaneOpen,
 } from "./favorites";
 import { showToast } from "./toast";
-import { registerCurrentPath, registeredPaths } from "./register";
+import { needsRegistration, registerCurrentPath, registeredPaths } from "./register";
 import {
   build,
   collectIconOpts,
   currentFontValue,
+  isLiveContent,
   isMathMode,
   isVerticalMode,
   isWrapMode,
@@ -43,12 +44,15 @@ import { setupTurnstileWidget } from "./turnstile";
 
 function updateRegisterUI(): void {
   const useGF = isGoogleFont(currentFontValue());
-  const useMath = isMathMode();
-  const needsReg = useGF || useMath;
+  // countdown / today 等は毎回サーバで描き直されるので Google Fonts を登録できない
+  const live = isLiveContent();
+  const needsReg = needsRegistration();
   const registered = needsReg && registeredPaths.has(build());
   const pending = needsReg && !registered;
 
-  $("fontInfoTip").classList.toggle("show", useGF);
+  $("fontInfoTip").classList.toggle("show", useGF && !live);
+  const liveWarn = document.getElementById("fontLiveWarn");
+  if (liveWarn) liveWarn.hidden = !(useGF && live);
 
   // URL 表示はまだ生成されていない状態であることを視覚的に伝える
   document
@@ -121,7 +125,9 @@ function update(): void {
   updateContrast();
   updateRegisterUI();
 
-  if (isMathMode() || isGoogleFont(currentFontValue())) {
+  // Path 化プレビューは登録対象のときだけ。countdown / today 等は日数や日付が
+  // 入った状態をサーバしか描けないので、配信物そのものをプレビューに出す。
+  if (needsRegistration()) {
     schedulePathifyPreview();
   } else {
     cancelScheduledPreview();
@@ -849,9 +855,7 @@ document
       const targetId = btn.dataset["copy"];
       if (!targetId) return;
       const target = document.getElementById(targetId) as HTMLInputElement;
-      const needsRegister =
-        (isMathMode() || isGoogleFont(currentFontValue())) &&
-        !registeredPaths.has(build());
+      const needsRegister = needsRegistration() && !registeredPaths.has(build());
 
       const isShareItem = btn.classList.contains("share-item");
       const itemLabels: Record<string, string> = {
@@ -954,7 +958,7 @@ const STORAGE_KEY = "cosense-icon:lastPath";
     applyPathname(pathname);
     update();
     setTimeout(() => {
-      if (isMathMode() || isGoogleFont(currentFontValue())) {
+      if (needsRegistration()) {
         const initial = isMathMode()
           ? "数式を SVG として登録しています..."
           : "Google Fonts を登録しています...";

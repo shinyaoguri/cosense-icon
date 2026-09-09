@@ -113,7 +113,9 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
 - **基準日**: `date-YYYY-MM-DD` (絶対日付のみ)。エイリアス `target` / `基準日`。未指定・不正時は日数 `0`。
 - タイムゾーンは動的キーワードと同じ優先度 (`tz` 明示 > 自動判定 > `Asia/Tokyo`) で「今日」を決める。
 - Google Fonts の path 化には非対応 (日数が毎日変わりキャッシュできないため。`today` 等と同じ制約で
-  システムフォントの `<text>` として描画される)。数式モード (`/math/`) との併用も非対応。
+  システムフォントの `<text>` として描画される)。`font` に Google Fonts を指定した場合は
+  **右下に「フォント未反映」の警告チップ**が付き、クリックでエディタが開く。数式モード
+  (`/math/`) との併用も非対応。
 
 エディタ (`/`) では 📅 ボタンでカウント種別 (ダウン / アップ) と基準日を選べる。`.svg` を外した
 URL からフォームを復元でき (URL = ステート)、プレビューにも即反映される。
@@ -139,7 +141,11 @@ URL からフォームを復元でき (URL = ステート)、プレビューに�
 - R2 miss 時は `<text>` フォールバックで描画し、右下に**「エディタで再生成」のチップマーカー**を付与 (短 TTL)。クリックでエディタが開いて自動で登録フローが起動する (`/?regen=base64(pathname)` 形式)
 - 対応ファミリは [src/editor/fonts.ts](src/editor/fonts.ts) の `GOOGLE_FONTS` 定数で管理
 
-動的キーワード (`today` / `week` / `month` / `year`) は対象外。
+動的キーワード (`today` / `week` / `month` / `year`) と `countdown` / `countup` は対象外。
+これらは内容がアクセスのたびに変わるため、パス全体をキーにした R2 の仕組みに乗らない。
+Google Fonts を指定しても閲覧側のシステムフォントで描画され、それが分かるよう右下に
+**「フォント未反映」の警告チップ**が付く。エディタ側でもフォント欄の下に理由を表示し、
+無駄になる R2 登録は行わない。
 
 フォントは [Google Fonts](https://fonts.google.com/) から CSS2 API 経由で取得し、ブラウザ上で [opentype.js](https://github.com/opentypejs/opentype.js) と [wawoff2](https://github.com/fontello/wawoff2) を使って Path に変換する。ライセンスは配信元の OFL / Apache 2.0。
 

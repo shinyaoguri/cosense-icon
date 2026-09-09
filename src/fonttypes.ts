@@ -1,0 +1,54 @@
+// 組版が必要とするフォントの最小インターフェース。
+//
+// 実体は 2 つある:
+//   - ブラウザ: opentype.js が parse した Font (エディタのプレビューと登録)
+//   - Worker:   R2 に置いたグリフパックから組み立てた擬似 Font (src/glyphpack.ts)
+//
+// src/pathrender.ts はこのインターフェースにしか触らないので、両者を同じ
+// 組版コードで描ける。opentype.js の実体に依存を足すとこの前提が壊れるため、
+// ここに無いメンバを組版側から呼ばないこと。
+
+export interface OpenTypePath {
+  toPathData(decimalPlaces?: number): string;
+  toSVG(decimalPlaces?: number): string;
+}
+
+export interface OpenTypeGlyph {
+  index: number;
+  advanceWidth?: number;
+  getPath(x: number, y: number, fontSize: number): OpenTypePath;
+}
+
+export interface OpenTypeSubstitution {
+  // 単一置換 (Single Substitution, GSUB Lookup Type 1) を取得
+  // フォントが該当 feature を持たない場合は null/undefined または空配列
+  getSingle(
+    feature: string,
+    script?: string,
+    language?: string,
+  ): { sub: number; by: number }[] | null | undefined;
+}
+
+export interface OpenTypeFont {
+  getPath(text: string, x: number, y: number, fontSize: number): OpenTypePath;
+  getAdvanceWidth(text: string, fontSize: number): number;
+  unitsPerEm?: number;
+  ascender?: number;
+  descender?: number;
+  charToGlyph?(ch: string): OpenTypeGlyph;
+  // GSUB shaping 後のグリフ列を返す (liga 等が適用済み、kern は GPOS なので別途)
+  stringToGlyphs?(text: string): OpenTypeGlyph[];
+  // 隣接グリフペアのカーニング値 (font units)。GPOS テーブルから取得。
+  getKerningValue?(left: OpenTypeGlyph, right: OpenTypeGlyph): number;
+  glyphs?: { get(index: number): OpenTypeGlyph };
+  substitution?: OpenTypeSubstitution;
+  tables?: {
+    vmtx?: { advanceHeights?: number[]; topSideBearings?: number[] };
+    vhea?: { ascent?: number; descent?: number };
+    [key: string]: unknown;
+  };
+}
+
+export interface OpenTypeGlobal {
+  parse(buffer: ArrayBuffer): OpenTypeFont;
+}
