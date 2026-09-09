@@ -1,3 +1,4 @@
+import { charsetForCount, DYNAMIC_CHARSET, normalizeCharset } from "./charset";
 import {
   computeDayCount,
   isDynamicKeyword,
@@ -6,24 +7,38 @@ import {
 } from "./dynamic";
 import editorHtml from "./editor.html";
 import {
+  createPackFont,
+  validatePack,
+  type GlyphPack,
+} from "./glyphpack";
+import {
   isGoogleFontCandidate,
   parsePath,
   substituteCountToken,
   type ParsedPath,
 } from "./parser";
+import {
+  buildSvgFromFont,
+  buildVerticalSvgFromFont,
+  toIconOpts,
+} from "./pathrender";
 import { deterministicPalette } from "./random";
 import {
   buildRegenUrl,
   computeKey,
-  markUnsupportedFont,
+  MATH_UNSUPPORTED_MARKER,
+  packKey,
+  packR2Key,
   r2Key,
   sanitizeSvg,
   verifyTurnstile,
   withEditorLink,
   withErrorMarker,
+  withMarker,
   type RegistryEnv,
 } from "./registry";
 import { renderSvg, renderVerticalSvg } from "./svg";
+import { packTextDrawer } from "./textdraw";
 
 const NO_STORE_HEADERS = {
   "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -290,6 +305,66 @@ function editorUrlFor(url: URL): string {
   return url.origin + url.pathname.replace(/\.svg$/i, "");
 }
 
+// パックはキー (ファミリ + ウェイト + 文字集合) ごとに不変なので、Cache API に置いて
+// R2 GET を初回だけにする。countdown は no-store で必ず Worker まで来るため、
+// ここを毎回 R2 に行かせると 1 表示 1 GET になってしまう。
+async function loadPack(
+  env: RegistryEnv,
+  ctx: ExecutionContext,
+  family: string,
+  weight: string,
+  charset: string,
+): Promise<GlyphPack | null> {
+  const hash = await packKey(family, weight, charset);
+  const cache = caches.default;
+  const cacheKey = new Request(`https://pack.cosense-icon.invalid/${hash}`);
+
+  const parse = (body: string): GlyphPack | null => {
+    try {
+      return validatePack(JSON.parse(body));
+    } catch {
+      return null;
+    }
+  };
+
+  const hit = await cache.match(cacheKey);
+  if (hit) return parse(await hit.text());
+
+  const obj = await env.ICON_PATHS.get(packR2Key(hash));
+  if (!obj) return null;
+  const body = await obj.text();
+  const pack = parse(body);
+  if (!pack) return null;
+
+  ctx.waitUntil(
+    cache.put(
+      cacheKey,
+      new Response(body, {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": IMMUTABLE_CACHE_CONTROL,
+        },
+      }),
+    ),
+  );
+  return pack;
+}
+
+// 内容がアクセスのたびに変わるパスで、グリフパックを使わずに描いたときの後始末。
+//   - Google Fonts 指定: パック未登録なので「エディタで再生成」チップ → 登録フローへ
+//   - 数式モード: 今も対応できない組み合わせなので理由を出す
+//   - それ以外 (システムフォント): 何も足さない
+function markLiveFallback(svg: string, parsed: ParsedPath, url: URL): string {
+  const { width, height } = parsed.options;
+  if (parsed.math) {
+    const editorUrl = editorUrlFor(url);
+    return withMarker(svg, width, height, editorUrl, MATH_UNSUPPORTED_MARKER);
+  }
+  if (!isGoogleFontCandidate(parsed.rawFontValue)) return svg;
+  const regen = url.origin + buildRegenUrl(url.pathname);
+  return withMarker(svg, width, height, regen);
+}
+
 async function handleIcon(
   url: URL,
   parsed: ParsedPath,
@@ -303,11 +378,24 @@ async function handleIcon(
       ?.timezone;
     const tz = resolveTimezone(parsed.options.timezone, cfTz);
     applyRandomPalette(parsed);
-    const svg = markUnsupportedFont(
-      renderDynamicSvg(dynamic, new Date(), tz, parsed.options),
-      parsed,
-      editorUrlFor(url),
-    );
+
+    // Google Fonts 指定なら、登録済みのグリフパックから <use> で組む。
+    // 4 キーワードが描きうる文字は固定なので、パックは 1 つを共有できる。
+    const pack =
+      isGoogleFontCandidate(parsed.rawFontValue) && !parsed.math
+        ? await loadPack(
+            env,
+            ctx,
+            parsed.rawFontValue!,
+            parsed.options.fontWeight,
+            DYNAMIC_CHARSET,
+          )
+        : null;
+    const drawer = pack ? packTextDrawer(createPackFont(pack)) : undefined;
+    const base = renderDynamicSvg(dynamic, new Date(), tz, parsed.options, drawer);
+    const svg = drawer
+      ? withEditorLink(base, editorUrlFor(url))
+      : markLiveFallback(base, parsed, url);
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,
@@ -330,10 +418,35 @@ async function handleIcon(
     );
     const text = substituteCountToken(parsed.text, n);
     applyRandomPalette(parsed);
-    const base = parsed.vertical
-      ? renderVerticalSvg(text, parsed.options, parsed.wrap)
-      : renderSvg(text, parsed.options, parsed.wrap);
-    const svg = markUnsupportedFont(base, parsed, editorUrlFor(url));
+
+    // 文字集合は元テキスト (プレースホルダを除いたもの) + 数字なので、日数が
+    // 何桁になっても同じパックで組める。桁数に応じた自動フィットは実グリフの
+    // advance で計算されるため、システムフォント時のような見積もりずれも起きない。
+    const pack =
+      isGoogleFontCandidate(parsed.rawFontValue) && !parsed.math
+        ? await loadPack(
+            env,
+            ctx,
+            parsed.rawFontValue!,
+            parsed.options.fontWeight,
+            charsetForCount(parsed.text),
+          )
+        : null;
+
+    let svg: string;
+    if (pack) {
+      const font = createPackFont(pack);
+      const io = toIconOpts(parsed.options);
+      const drawn = parsed.vertical
+        ? buildVerticalSvgFromFont(font, text, io, parsed.wrap)
+        : buildSvgFromFont(font, text, io, parsed.wrap);
+      svg = withEditorLink(drawn, editorUrlFor(url));
+    } else {
+      const base = parsed.vertical
+        ? renderVerticalSvg(text, parsed.options, parsed.wrap)
+        : renderSvg(text, parsed.options, parsed.wrap);
+      svg = markLiveFallback(base, parsed, url);
+    }
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,
@@ -410,6 +523,51 @@ async function handleIcon(
   return response;
 }
 
+// グリフパックの登録。Turnstile 検証は呼び出し元で済ませてある。
+//
+// キーはクライアントに決めさせず、(family, weight, charset) から Worker が
+// 再計算する。charset も正規化し直すので、並びを変えて別キーを作ることはできない。
+// パック本体は validatePack が形と path データを検めるので、sanitizeSvg と同じ
+// 役割をここが担う。
+async function registerPack(
+  body: { family?: unknown; weight?: unknown; charset?: unknown; pack?: unknown },
+  env: RegistryEnv,
+): Promise<Response> {
+  if (
+    typeof body.family !== "string" ||
+    typeof body.weight !== "string" ||
+    typeof body.charset !== "string" ||
+    !body.family ||
+    !body.charset
+  ) {
+    return new Response("missing pack fields", { status: 400 });
+  }
+  if (!isGoogleFontCandidate(body.family)) {
+    return new Response("family is a system font shortcut", { status: 400 });
+  }
+
+  let pack: GlyphPack;
+  try {
+    pack = validatePack(body.pack);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "invalid pack";
+    return new Response("invalid pack: " + msg, { status: 400 });
+  }
+
+  const serialized = JSON.stringify(pack);
+  if (serialized.length > MAX_REGISTER_BYTES) {
+    return new Response("pack too large", { status: 413 });
+  }
+
+  const charset = normalizeCharset(body.charset);
+  const hash = await packKey(body.family, body.weight, charset);
+  await env.ICON_PATHS.put(packR2Key(hash), serialized, {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+  });
+
+  return Response.json({ ok: true, key: hash });
+}
+
 async function handleRegister(
   request: Request,
   env: RegistryEnv,
@@ -426,24 +584,33 @@ async function handleRegister(
   }
 
   const body = payload as
-    | { pathname?: unknown; svg?: unknown; turnstileToken?: unknown }
+    | {
+        kind?: unknown;
+        pathname?: unknown;
+        svg?: unknown;
+        turnstileToken?: unknown;
+        family?: unknown;
+        weight?: unknown;
+        charset?: unknown;
+        pack?: unknown;
+      }
     | null;
-  if (
-    !body ||
-    typeof body.pathname !== "string" ||
-    typeof body.svg !== "string" ||
-    typeof body.turnstileToken !== "string"
-  ) {
+  if (!body || typeof body.turnstileToken !== "string") {
     return new Response("missing fields", { status: 400 });
-  }
-
-  if (body.svg.length > MAX_REGISTER_BYTES) {
-    return new Response("svg too large", { status: 413 });
   }
 
   const ip = request.headers.get("cf-connecting-ip") ?? undefined;
   const ok = await verifyTurnstile(body.turnstileToken, env.TURNSTILE_SECRET, ip);
   if (!ok) return new Response("turnstile failed", { status: 403 });
+
+  if (body.kind === "pack") return registerPack(body, env);
+
+  if (typeof body.pathname !== "string" || typeof body.svg !== "string") {
+    return new Response("missing fields", { status: 400 });
+  }
+  if (body.svg.length > MAX_REGISTER_BYTES) {
+    return new Response("svg too large", { status: 413 });
+  }
 
   const parsed = parsePath(body.pathname);
   if (!parsed) return new Response("invalid pathname", { status: 400 });

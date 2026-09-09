@@ -30,7 +30,12 @@ import {
   savePaneOpen,
 } from "./favorites";
 import { showToast } from "./toast";
-import { needsRegistration, registerCurrentPath, registeredPaths } from "./register";
+import {
+  isCurrentRegistered,
+  needsRegistration,
+  registerCurrentPath,
+  registrationKind,
+} from "./register";
 import {
   build,
   collectIconOpts,
@@ -44,15 +49,13 @@ import { setupTurnstileWidget } from "./turnstile";
 
 function updateRegisterUI(): void {
   const useGF = isGoogleFont(currentFontValue());
-  // countdown / today 等は毎回サーバで描き直されるので Google Fonts を登録できない
-  const live = isLiveContent();
   const needsReg = needsRegistration();
-  const registered = needsReg && registeredPaths.has(build());
-  const pending = needsReg && !registered;
+  const pending = needsReg && !isCurrentRegistered();
 
-  $("fontInfoTip").classList.toggle("show", useGF && !live);
+  $("fontInfoTip").classList.toggle("show", useGF);
+  // 残る非対応の組み合わせは数式モード × 内容が毎回変わるパスだけ
   const liveWarn = document.getElementById("fontLiveWarn");
-  if (liveWarn) liveWarn.hidden = !(useGF && live);
+  if (liveWarn) liveWarn.hidden = !(isMathMode() && isLiveContent());
 
   // URL 表示はまだ生成されていない状態であることを視覚的に伝える
   document
@@ -125,9 +128,9 @@ function update(): void {
   updateContrast();
   updateRegisterUI();
 
-  // Path 化プレビューは登録対象のときだけ。countdown / today 等は日数や日付が
-  // 入った状態をサーバしか描けないので、配信物そのものをプレビューに出す。
-  if (needsRegistration()) {
+  // Path 化プレビューは 1 URL 1 枚で登録するときだけ。グリフパック方式は日数や
+  // 日付をサーバが埋めるので、配信物そのものをプレビューに出す (= 見たままが届く)。
+  if (registrationKind() === "svg") {
     schedulePathifyPreview();
   } else {
     cancelScheduledPreview();
@@ -855,7 +858,7 @@ document
       const targetId = btn.dataset["copy"];
       if (!targetId) return;
       const target = document.getElementById(targetId) as HTMLInputElement;
-      const needsRegister = needsRegistration() && !registeredPaths.has(build());
+      const needsRegister = needsRegistration() && !isCurrentRegistered();
 
       const isShareItem = btn.classList.contains("share-item");
       const itemLabels: Record<string, string> = {
@@ -871,7 +874,9 @@ document
         if (!isShareItem) btn.textContent = "登録中...";
         const initialMsg = isMathMode()
           ? "数式を SVG として登録しています..."
-          : "Google Fonts を登録しています...";
+          : registrationKind() === "pack"
+            ? "Google Fonts のグリフを登録しています..."
+            : "Google Fonts を登録しています...";
         showToast(initialMsg, "progress");
         try {
           await registerCurrentPath(msg => {
@@ -880,7 +885,7 @@ document
               msg.startsWith("MathJax") ? "MathJax を読み込み中..."
               : msg.startsWith("数式") ? "数式を SVG パスに変換中..."
               : msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
-              : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
+              : msg.startsWith("Path") ? "グリフを SVG パスに変換中..."
               : msg.startsWith("認証") ? "Turnstile で認証中..."
               : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."
               : msg;
@@ -961,14 +966,16 @@ const STORAGE_KEY = "cosense-icon:lastPath";
       if (needsRegistration()) {
         const initial = isMathMode()
           ? "数式を SVG として登録しています..."
-          : "Google Fonts を登録しています...";
+          : registrationKind() === "pack"
+            ? "Google Fonts のグリフを登録しています..."
+            : "Google Fonts を登録しています...";
         showToast(initial, "progress");
         registerCurrentPath(msg => {
           const detail =
             msg.startsWith("MathJax") ? "MathJax を読み込み中..."
             : msg.startsWith("数式") ? "数式を SVG パスに変換中..."
             : msg.startsWith("フォント") ? "Google Fonts のフォントを取得中..."
-            : msg.startsWith("Path") ? "テキストを SVG パスに変換中..."
+            : msg.startsWith("Path") ? "グリフを SVG パスに変換中..."
             : msg.startsWith("認証") ? "Turnstile で認証中..."
             : msg.startsWith("登録") ? "サーバーに登録中 (R2 アップロード)..."
             : msg;

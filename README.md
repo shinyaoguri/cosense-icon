@@ -112,10 +112,9 @@ https://icon.soui.dev/bg-111/fg-fae/radius-24/B4\nゼミ.svg
   `/vertical/` (縦書き) / `/wrap/` (自動改行) などがそのまま効く。
 - **基準日**: `date-YYYY-MM-DD` (絶対日付のみ)。エイリアス `target` / `基準日`。未指定・不正時は日数 `0`。
 - タイムゾーンは動的キーワードと同じ優先度 (`tz` 明示 > 自動判定 > `Asia/Tokyo`) で「今日」を決める。
-- Google Fonts の path 化には非対応 (日数が毎日変わりキャッシュできないため。`today` 等と同じ制約で
-  システムフォントの `<text>` として描画される)。`font` に Google Fonts を指定した場合は
-  **右下に「フォント未反映」の警告チップ**が付き、クリックでエディタが開く。数式モード
-  (`/math/`) との併用も非対応。
+- **Google Fonts も使える** (グリフパック方式。後述)。未登録の場合は `<text>` フォールバックに
+  「エディタで再生成」チップが付き、クリックで登録フローが起動する。
+- 数式モード (`/math/`) との併用は非対応 (右下に「数式未対応」チップが付く)。
 
 エディタ (`/`) では 📅 ボタンでカウント種別 (ダウン / アップ) と基準日を選べる。`.svg` を外した
 URL からフォームを復元でき (URL = ステート)、プレビューにも即反映される。
@@ -141,11 +140,31 @@ URL からフォームを復元でき (URL = ステート)、プレビューに�
 - R2 miss 時は `<text>` フォールバックで描画し、右下に**「エディタで再生成」のチップマーカー**を付与 (短 TTL)。クリックでエディタが開いて自動で登録フローが起動する (`/?regen=base64(pathname)` 形式)
 - 対応ファミリは [src/editor/fonts.ts](src/editor/fonts.ts) の `GOOGLE_FONTS` 定数で管理
 
-動的キーワード (`today` / `week` / `month` / `year`) と `countdown` / `countup` は対象外。
-これらは内容がアクセスのたびに変わるため、パス全体をキーにした R2 の仕組みに乗らない。
-Google Fonts を指定しても閲覧側のシステムフォントで描画され、それが分かるよう右下に
-**「フォント未反映」の警告チップ**が付く。エディタ側でもフォント欄の下に理由を表示し、
-無駄になる R2 登録は行わない。
+### 内容が毎回変わるアイコン: グリフパック方式
+
+`countdown` / `countup` と動的キーワード (`today` / `week` / `month` / `year`) は内容がアクセスの
+たびに変わるので、「1 URL = 完成 SVG 1 枚」を R2 に置く上記の仕組みには乗らない。
+そこで**キャッシュの単位をグリフまで下げる**。文字列は毎日変わっても、**文字集合は変わらない**。
+
+- エディタが登録するのは SVG ではなく、`(ファミリ, ウェイト, 文字集合)` に対する
+  **グリフパック** (各グリフの path・advance・カーニング・縦書き置換を持つ小さな JSON)。
+  R2 キーは `pk1/<hash>.json` で、完成 SVG の `v1/<hash>.svg` とは名前空間が分かれている
+- 文字集合は countdown なら「テキストからプレースホルダを除いた文字 + 数字と空白」、
+  動的キーワードなら 4 種が描きうる文字の和集合 ([src/charset.ts](src/charset.ts))
+- Worker は日数や日付を計算してから、そのパックでその場で組む。日数の桁数が変わっても
+  実グリフの advance で自動フィットするので、閲覧側にフォントが無くても崩れない
+- パックはキーごとに不変なので Cache API に載る。R2 GET は初回だけ
+- 色・サイズ・余白を変えてもパックは変わらないため、登録し直しは不要
+
+パックが未登録なら従来どおり `<text>` フォールバック + 「エディタで再生成」チップになる。
+
+`src/pathrender.ts` の組版コードは `src/fonttypes.ts` の `OpenTypeFont` インターフェース
+だけに依存しており、ブラウザの opentype.js と [createPackFont](src/glyphpack.ts) を
+区別しない。だから同じ組版がブラウザと Worker の両方で動く。
+
+登録されたパックは外から届くので、[validatePack](src/glyphpack.ts) が形と path データを
+検証する (path は絶対座標の `M` / `L` / `Q` / `C` / `Z` と数値のみ許可)。これが SVG 側の
+`sanitizeSvg` に相当する防御。
 
 フォントは [Google Fonts](https://fonts.google.com/) から CSS2 API 経由で取得し、ブラウザ上で [opentype.js](https://github.com/opentypejs/opentype.js) と [wawoff2](https://github.com/fontello/wawoff2) を使って Path に変換する。ライセンスは配信元の OFL / Apache 2.0。
 
@@ -196,6 +215,13 @@ Google Fonts を指定しても閲覧側のシステムフォントで描画さ�
 ### KEY_VERSION の運用
 
 [src/registry.ts](src/registry.ts) の `KEY_VERSION` は R2 キーと Cache API キーの prefix。SVG レンダリング仕様 ([src/svg.ts](src/svg.ts) / [src/dynamic.ts](src/dynamic.ts)) を変更して「同じオプション集合でも見た目が変わる」非互換変更を入れる場合は必ず bump (`v1` → `v2`)。新オプションを追加するだけならハッシュに含まれるため bump 不要。
+
+### PACK_KEY_VERSION の運用
+
+[src/registry.ts](src/registry.ts) の `PACK_KEY_VERSION` はグリフパックの R2 キー prefix。
+パックの JSON 形式を非互換に変えるときだけ bump する ([src/glyphpack.ts](src/glyphpack.ts) の
+`PACK_VERSION` も同時に上げる)。完成 SVG 側の `KEY_VERSION` とは独立していて、
+片方を上げてももう片方には影響しない。
 
 ## PWA
 

@@ -1,4 +1,4 @@
-import { isGoogleFontCandidate, type ParsedPath } from "./parser";
+import type { ParsedPath } from "./parser";
 
 export interface RegistryEnv {
   ICON_PATHS: R2Bucket;
@@ -41,8 +41,7 @@ function normalizedKeyParts(parsed: ParsedPath): string {
   ].join("|");
 }
 
-export async function computeKey(parsed: ParsedPath): Promise<string> {
-  const source = normalizedKeyParts(parsed);
+async function sha256Hex(source: string): Promise<string> {
   const buf = new TextEncoder().encode(source);
   const hash = await crypto.subtle.digest("SHA-256", buf);
   const bytes = new Uint8Array(hash);
@@ -51,8 +50,34 @@ export async function computeKey(parsed: ParsedPath): Promise<string> {
   return hex.slice(0, 32);
 }
 
+export async function computeKey(parsed: ParsedPath): Promise<string> {
+  return sha256Hex(normalizedKeyParts(parsed));
+}
+
 export function r2Key(hash: string): string {
   return `${KEY_VERSION}/${hash}.svg`;
+}
+
+// グリフパックの R2 キー prefix。完成 SVG (`v1/<hash>.svg`) とは名前空間を分けてあるので、
+// 片方の版を上げてももう片方には影響しない。
+// パックの JSON 形式を非互換に変える場合はここを bump する
+// (src/glyphpack.ts の PACK_VERSION も同時に上げること)。
+export const PACK_KEY_VERSION = "pk1";
+
+/**
+ * グリフパックのキー。パスではなく (ファミリ, ウェイト, 文字集合) から作る。
+ * 日数や日付はキーに入らないので、内容が毎日変わっても同じパックを引き続けられる。
+ */
+export async function packKey(
+  family: string,
+  weight: string,
+  charset: string,
+): Promise<string> {
+  return sha256Hex(`pack|${PACK_KEY_VERSION}|${family}|${weight}|${charset}`);
+}
+
+export function packR2Key(hash: string): string {
+  return `${PACK_KEY_VERSION}/${hash}.json`;
 }
 
 export function buildRegenUrl(pathname: string): string {
@@ -163,36 +188,28 @@ export function withErrorMarker(
   return withComment.replace("</svg>", `${style}${marker}\n</svg>`);
 }
 
-// Google Fonts はエディタが Path 化した SVG を R2 から引く仕組みなので、内容が
-// アクセスのたびに変わるパス (countdown / countup / 動的キーワード) では効かず、
-// 閲覧側のシステムフォントに落ちる。黙って落ちると気付けないので警告チップを付け、
-// クリックでエディタ (理由を表示する) へ飛ばす。
-export const FONT_UNSUPPORTED_MARKER: ErrorMarkerText = {
-  label: "フォント未反映",
+// 数式モードは MathJax をブラウザで走らせて SVG 化するため、内容がアクセスのたびに
+// 変わるパス (countdown / countup / 動的キーワード) では使えない。TeX のソースが
+// そのまま文字として出るので、理由が分かるようチップを付ける。
+export const MATH_UNSUPPORTED_MARKER: ErrorMarkerText = {
+  label: "数式未対応",
   tooltip:
     "内容が毎回変わるアイコン (countdown / countup / today など) では " +
-    "Google Fonts を適用できず、システムフォントで描画しています。" +
-    "クリックでエディタを開きます。",
+    "数式モードを使えません。クリックでエディタを開きます。",
 };
 
-/**
- * Google Fonts を指定しているのに適用できないパスへ警告チップを付ける。
- * システムフォント指定 (sans / serif 等) や font 未指定なら何もしない。
- */
-export function markUnsupportedFont(
+/** 警告チップを付け、外側をリンクで包む (この 2 つは必ず対で使う) */
+export function withMarker(
   svg: string,
-  parsed: ParsedPath,
-  editorUrl: string,
+  width: number,
+  height: number,
+  linkUrl: string,
+  text: ErrorMarkerText = REGEN_MARKER,
 ): string {
-  if (!isGoogleFontCandidate(parsed.rawFontValue)) return svg;
-  const withChip = withErrorMarker(
-    svg,
-    parsed.options.width,
-    parsed.options.height,
-    editorUrl,
-    FONT_UNSUPPORTED_MARKER,
+  return withEditorLink(
+    withErrorMarker(svg, width, height, linkUrl, text),
+    linkUrl,
   );
-  return withEditorLink(withChip, editorUrl);
 }
 
 const DANGEROUS_TAGS =
