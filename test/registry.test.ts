@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   buildRegenUrl,
   computeKey,
-  markUnsupportedFont,
+  MATH_UNSUPPORTED_MARKER,
+  packKey,
+  packR2Key,
   r2Key,
   sanitizeSvg,
   withEditorLink,
   withErrorMarker,
+  withMarker,
 } from "../src/registry";
 import { parsePath } from "../src/parser";
 
@@ -126,35 +129,48 @@ describe("withErrorMarker", () => {
   });
 });
 
-describe("markUnsupportedFont", () => {
+describe("withMarker", () => {
   const base =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect/></svg>`;
 
-  it("Google Fonts 指定の countdown には警告チップとエディタリンクが付く", () => {
-    const parsed = parsePath("/countdown/date-2026-12-31/font-Roboto/あと{d}日.svg")!;
-    const out = markUnsupportedFont(base, parsed, "/countdown/x");
-    expect(out).toContain("フォント未反映");
-    expect(out).toContain('<a class="ic-edit" href="/countdown/x"');
+  it("チップとリンクを対で付ける", () => {
+    const out = withMarker(base, 600, 400, "/?regen=x");
+    expect(out).toContain('class="ic-warn"');
+    expect(out).toContain('<a class="ic-edit" href="/?regen=x"');
+    expect(out).toContain("エディタで再生成");
   });
 
-  it("動的キーワード + Google Fonts にも付く", () => {
-    const parsed = parsePath("/font-Rampart One/today.svg")!;
-    expect(markUnsupportedFont(base, parsed, "/today")).toContain(
-      "フォント未反映",
+  it("数式未対応マーカーを渡せる", () => {
+    const out = withMarker(base, 600, 400, "/edit", MATH_UNSUPPORTED_MARKER);
+    expect(out).toContain("数式未対応");
+    expect(out).not.toContain("エディタで再生成");
+  });
+});
+
+describe("packKey / packR2Key", () => {
+  it("文字集合が違えば別キー", async () => {
+    const a = await packKey("Roboto", "700", "0123456789");
+    const b = await packKey("Roboto", "700", "0123456789日");
+    expect(a).not.toBe(b);
+  });
+
+  it("ファミリ・ウェイトが違えば別キー", async () => {
+    const a = await packKey("Roboto", "700", "abc");
+    expect(await packKey("Inter", "700", "abc")).not.toBe(a);
+    expect(await packKey("Roboto", "400", "abc")).not.toBe(a);
+  });
+
+  it("同じ入力なら同じキー", async () => {
+    expect(await packKey("Roboto", "700", "abc")).toBe(
+      await packKey("Roboto", "700", "abc"),
     );
   });
 
-  it("システムフォントのショートカットでは付かない", () => {
-    for (const font of ["sans", "serif", "mono", "rounded", "gothic", "mincho"]) {
-      const parsed = parsePath(`/countdown/font-${font}/あと{d}日.svg`)!;
-      expect(markUnsupportedFont(base, parsed, "/x")).toBe(base);
-    }
-  });
-
-  it("font 未指定では付かない", () => {
-    const parsed = parsePath("/countdown/date-2026-12-31/あと{d}日.svg")!;
-    expect(markUnsupportedFont(base, parsed, "/x")).toBe(base);
+  it("完成 SVG とは別の名前空間に入る", async () => {
+    const hash = await packKey("Roboto", "700", "abc");
+    expect(packR2Key(hash)).toBe(`pk1/${hash}.json`);
+    expect(r2Key(hash)).toBe(`v1/${hash}.svg`);
   });
 });
 

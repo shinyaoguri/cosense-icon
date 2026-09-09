@@ -101,9 +101,18 @@ export function isCountMode(): boolean {
   return !!inp?.checked;
 }
 
+/**
+ * URL に載る実際のテキスト行。build() と同じく、空なら "sample" に落ちる。
+ * サーバが同じ文字集合を導けるよう、パック登録はこれを見る。
+ */
+export function effectiveTextLines(): string[] {
+  const raw = $textarea("text").value;
+  return (raw.length ? raw : "sample").split(/\r?\n/);
+}
+
 /** 現在のテキストが動的キーワード (today / week / month / year) ならそれを返す */
 export function currentDynamicKeyword(): string | null {
-  return isDynamicKeyword($textarea("text").value.split(/\r?\n/));
+  return isDynamicKeyword(effectiveTextLines());
 }
 
 /**
