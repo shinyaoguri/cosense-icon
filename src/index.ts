@@ -15,6 +15,7 @@ import { deterministicPalette } from "./random";
 import {
   buildRegenUrl,
   computeKey,
+  markUnsupportedFont,
   r2Key,
   sanitizeSvg,
   verifyTurnstile,
@@ -285,6 +286,10 @@ function applyRandomPalette(parsed: ParsedPath): void {
   if (!parsed.explicit.has("fg")) parsed.options.fg = palette.fg;
 }
 
+function editorUrlFor(url: URL): string {
+  return url.origin + url.pathname.replace(/\.svg$/i, "");
+}
+
 async function handleIcon(
   url: URL,
   parsed: ParsedPath,
@@ -298,7 +303,11 @@ async function handleIcon(
       ?.timezone;
     const tz = resolveTimezone(parsed.options.timezone, cfTz);
     applyRandomPalette(parsed);
-    const svg = renderDynamicSvg(dynamic, new Date(), tz, parsed.options);
+    const svg = markUnsupportedFont(
+      renderDynamicSvg(dynamic, new Date(), tz, parsed.options),
+      parsed,
+      editorUrlFor(url),
+    );
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,
@@ -321,9 +330,10 @@ async function handleIcon(
     );
     const text = substituteCountToken(parsed.text, n);
     applyRandomPalette(parsed);
-    const svg = parsed.vertical
+    const base = parsed.vertical
       ? renderVerticalSvg(text, parsed.options, parsed.wrap)
       : renderSvg(text, parsed.options, parsed.wrap);
+    const svg = markUnsupportedFont(base, parsed, editorUrlFor(url));
     return new Response(svg, {
       headers: {
         "content-type": SVG_CONTENT_TYPE,

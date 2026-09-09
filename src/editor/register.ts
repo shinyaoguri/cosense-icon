@@ -6,6 +6,7 @@ import {
   build,
   collectIconOpts,
   currentFontValue,
+  isLiveContent,
   isMathMode,
   isVerticalMode,
   isWrapMode,
@@ -18,6 +19,9 @@ export type ProgressCb = (msg: string) => void;
 
 /** 登録対象 (Google Fonts または 数式モード) かどうか */
 export function needsRegistration(): boolean {
+  // countdown / today 等はサーバがアクセスのたびに描き直すので、ここで
+  // Path 化した SVG を登録しても引かれない。登録しに行かないこと自体が正しい挙動。
+  if (isLiveContent()) return false;
   return isMathMode() || isGoogleFont(currentFontValue());
 }
 

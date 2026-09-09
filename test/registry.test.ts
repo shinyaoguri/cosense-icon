@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildRegenUrl,
   computeKey,
+  markUnsupportedFont,
   r2Key,
   sanitizeSvg,
   withEditorLink,
@@ -101,6 +102,59 @@ describe("withErrorMarker", () => {
   it("元のSVGの </svg> を保持", () => {
     const out = withErrorMarker(base, 600, 400, "/?regen=x");
     expect(out.endsWith("</svg>")).toBe(true);
+  });
+
+  it("ラベルを差し替えられ、chip 幅がラベル長に追従する", () => {
+    const out = withErrorMarker(base, 600, 400, "/x", {
+      label: "フォント未反映",
+      tooltip: "テスト用",
+    });
+    expect(out).toContain("フォント未反映");
+    expect(out).toContain("テスト用");
+    expect(out).not.toContain("エディタで再生成");
+    // 7 文字 × 12px + 58 = 142
+    expect(out).toContain('width="142"');
+  });
+
+  it("ラベルが長いと chip に切り替わる下限幅も広がる", () => {
+    const long = { label: "とても長い警告ラベルです", tooltip: "t" };
+    // 12 文字 → chipW 202。幅 200 では chip に収まらずコンパクト版
+    expect(withErrorMarker(base, 200, 400, "/x", long)).not.toContain(
+      long.label,
+    );
+    expect(withErrorMarker(base, 400, 400, "/x", long)).toContain(long.label);
+  });
+});
+
+describe("markUnsupportedFont", () => {
+  const base =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect/></svg>`;
+
+  it("Google Fonts 指定の countdown には警告チップとエディタリンクが付く", () => {
+    const parsed = parsePath("/countdown/date-2026-12-31/font-Roboto/あと{d}日.svg")!;
+    const out = markUnsupportedFont(base, parsed, "/countdown/x");
+    expect(out).toContain("フォント未反映");
+    expect(out).toContain('<a class="ic-edit" href="/countdown/x"');
+  });
+
+  it("動的キーワード + Google Fonts にも付く", () => {
+    const parsed = parsePath("/font-Rampart One/today.svg")!;
+    expect(markUnsupportedFont(base, parsed, "/today")).toContain(
+      "フォント未反映",
+    );
+  });
+
+  it("システムフォントのショートカットでは付かない", () => {
+    for (const font of ["sans", "serif", "mono", "rounded", "gothic", "mincho"]) {
+      const parsed = parsePath(`/countdown/font-${font}/あと{d}日.svg`)!;
+      expect(markUnsupportedFont(base, parsed, "/x")).toBe(base);
+    }
+  });
+
+  it("font 未指定では付かない", () => {
+    const parsed = parsePath("/countdown/date-2026-12-31/あと{d}日.svg")!;
+    expect(markUnsupportedFont(base, parsed, "/x")).toBe(base);
   });
 });
 

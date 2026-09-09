@@ -1,4 +1,5 @@
 import type { IconOpts } from "../pathrender";
+import { isDynamicKeyword } from "../dynamic";
 import { $input, $select, $textarea } from "./dom";
 
 export interface Defaults {
@@ -93,6 +94,25 @@ export function isVerticalMode(): boolean {
 export function isWrapMode(): boolean {
   const inp = document.getElementById("wrap") as HTMLInputElement | null;
   return !!inp?.checked;
+}
+
+export function isCountMode(): boolean {
+  const inp = document.getElementById("count") as HTMLInputElement | null;
+  return !!inp?.checked;
+}
+
+/** 現在のテキストが動的キーワード (today / week / month / year) ならそれを返す */
+export function currentDynamicKeyword(): string | null {
+  return isDynamicKeyword($textarea("text").value.split(/\r?\n/));
+}
+
+/**
+ * アクセス時点で内容が決まるアイコンか (countdown / countup / today 等)。
+ * この種のパスは毎回サーバで描き直されるので、エディタが Path 化した SVG を
+ * R2 に登録しても引かれない。
+ */
+export function isLiveContent(): boolean {
+  return isCountMode() || currentDynamicKeyword() !== null;
 }
 
 export function build(): string {
