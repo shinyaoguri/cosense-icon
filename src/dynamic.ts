@@ -1,5 +1,6 @@
 import type { IconOptions } from "./parser";
 import { escapeXml, rotationWrap } from "./svg";
+import { systemTextDrawer, type TextDrawer } from "./textdraw";
 
 export const DEFAULT_TZ = "Asia/Tokyo";
 
@@ -121,7 +122,7 @@ function wrapDynamicSvg(
   bg: string,
   radius: number,
   rotate: number,
-  opts?: { gradTo?: string; gradAngle?: number },
+  opts?: { gradTo?: string; gradAngle?: number; extraDefs?: string },
 ): string {
   let gradDef = "";
   let bgFillVal = escapeXml(bg);
@@ -133,14 +134,17 @@ function wrapDynamicSvg(
     const y1 = (0.5 - dy / 2) * 100;
     const x2 = (0.5 + dx / 2) * 100;
     const y2 = (0.5 + dy / 2) * 100;
-    gradDef = `<defs><linearGradient id="bgGrad" x1="${x1.toFixed(2)}%" y1="${y1.toFixed(2)}%" x2="${x2.toFixed(2)}%" y2="${y2.toFixed(2)}%"><stop offset="0%" stop-color="${escapeXml(bg)}"/><stop offset="100%" stop-color="${escapeXml(opts.gradTo)}"/></linearGradient></defs>`;
+    gradDef = `<linearGradient id="bgGrad" x1="${x1.toFixed(2)}%" y1="${y1.toFixed(2)}%" x2="${x2.toFixed(2)}%" y2="${y2.toFixed(2)}%"><stop offset="0%" stop-color="${escapeXml(bg)}"/><stop offset="100%" stop-color="${escapeXml(opts.gradTo)}"/></linearGradient>`;
     bgFillVal = "url(#bgGrad)";
   }
+  // グラデ定義とグリフ定義は 1 つの <defs> にまとめる。どちらも無ければ <defs> 自体を出さない。
+  const defsInner = gradDef + (opts?.extraDefs ?? "");
+  const defs = defsInner ? `<defs>${defsInner}</defs>` : "";
   const bgRect =
     radius > 0
       ? `<rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="${bgFillVal}"/>`
       : `<rect width="${w}" height="${h}" fill="${bgFillVal}"/>`;
-  const inner = `${gradDef}${bgRect}\n${innerBody}`;
+  const inner = `${defs}${bgRect}\n${innerBody}`;
   const { outerW, outerH, transform } = rotationWrap(w, h, rotate);
   const body = transform ? `<g transform="${transform}">\n${inner}\n</g>` : inner;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -153,6 +157,7 @@ export function renderTodaySvg(
   now: Date,
   tz: string,
   opts: IconOptions,
+  drawer?: TextDrawer,
 ): string {
   const t = getTzDate(now, tz);
   const mmdd = `${String(t.month).padStart(2, "0")}/${String(t.day).padStart(2, "0")}`;
@@ -176,22 +181,29 @@ export function renderTodaySvg(
   const subBaseline = mainBaseline + mainSize * gapRatio + subSize;
   const x = opts.width / 2;
 
-  const font = escapeXml(opts.fontFamily);
-  const weight = escapeXml(opts.fontWeight);
-  const fg = escapeXml(opts.fg);
+  const d = drawer ?? systemTextDrawer(opts.fontFamily);
 
   const body = [
-    `<text x="${x}" y="${mainBaseline}" fill="${fg}" font-family="${font}" font-weight="${weight}" font-size="${mainSize}" text-anchor="middle">${escapeXml(mmdd)}</text>`,
-    `<text x="${x}" y="${subBaseline}" fill="${fg}" font-family="${font}" font-size="${subSize}" text-anchor="middle" opacity="0.65">${escapeXml(wd)}</text>`,
+    d.draw(mmdd, x, mainBaseline, {
+      fill: opts.fg,
+      fontSize: mainSize,
+      fontWeight: opts.fontWeight,
+    }),
+    d.draw(wd, x, subBaseline, {
+      fill: opts.fg,
+      fontSize: subSize,
+      opacity: 0.65,
+    }),
   ].join("\n");
 
-  return wrapDynamicSvg(body, opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
+  return wrapDynamicSvg(body, opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle, extraDefs: d.defs() });
 }
 
 export function renderWeekSvg(
   now: Date,
   tz: string,
   opts: IconOptions,
+  drawer?: TextDrawer,
 ): string {
   const t = getTzDate(now, tz);
   const todayUtc = Date.UTC(t.year, t.month - 1, t.day);
@@ -226,42 +238,56 @@ export function renderWeekSvg(
   const dateY = labelY + labelSize * 0.15 + gapInCell + dateSize * 0.85;
   const cellRadius = unit * 0.1;
 
-  const font = escapeXml(opts.fontFamily);
-  const weight = escapeXml(opts.fontWeight);
-  const fg = escapeXml(opts.fg);
-  const bg = escapeXml(opts.bg);
+  const draw = drawer ?? systemTextDrawer(opts.fontFamily);
+  const fgAttr = escapeXml(opts.fg);
 
   const body: string[] = [];
   body.push(
-    `<text x="${opts.width / 2}" y="${titleY}" fill="${fg}" font-family="${font}" font-size="${titleSize}" font-weight="500" text-anchor="middle" opacity="0.65">${escapeXml(titleText)}</text>`,
+    draw.draw(titleText, opts.width / 2, titleY, {
+      fill: opts.fg,
+      fontSize: titleSize,
+      fontWeight: "500",
+      opacity: 0.65,
+    }),
   );
 
   days.forEach((d, i) => {
     const x = baseX + i * (cellW + gap);
     const cx = x + cellW / 2;
-    const textColor = d.isToday ? bg : fg;
+    // 今日のセルは fg で塗り潰すので、文字は bg で抜く
+    const textColor = d.isToday ? opts.bg : opts.fg;
     const labelOpacity = d.isToday ? 1 : 0.55;
 
     if (d.isToday) {
       body.push(
-        `<rect x="${x}" y="${gridTop}" width="${cellW}" height="${cellH}" rx="${cellRadius}" ry="${cellRadius}" fill="${fg}"/>`,
+        `<rect x="${x}" y="${gridTop}" width="${cellW}" height="${cellH}" rx="${cellRadius}" ry="${cellRadius}" fill="${fgAttr}"/>`,
       );
     }
     body.push(
-      `<text x="${cx}" y="${labelY}" fill="${textColor}" font-family="${font}" font-size="${labelSize}" font-weight="500" text-anchor="middle" opacity="${labelOpacity}">${WEEKDAYS_JA[i]}</text>`,
+      draw.draw(WEEKDAYS_JA[i]!, cx, labelY, {
+        fill: textColor,
+        fontSize: labelSize,
+        fontWeight: "500",
+        opacity: labelOpacity,
+      }),
     );
     body.push(
-      `<text x="${cx}" y="${dateY}" fill="${textColor}" font-family="${font}" font-weight="${weight}" font-size="${dateSize}" text-anchor="middle">${d.day}</text>`,
+      draw.draw(String(d.day), cx, dateY, {
+        fill: textColor,
+        fontSize: dateSize,
+        fontWeight: opts.fontWeight,
+      }),
     );
   });
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle, extraDefs: draw.defs() });
 }
 
 export function renderMonthSvg(
   now: Date,
   tz: string,
   opts: IconOptions,
+  drawer?: TextDrawer,
 ): string {
   const t = getTzDate(now, tz);
   const firstWd = weekdayMon0(t.year, t.month, 1);
@@ -307,21 +333,29 @@ export function renderMonthSvg(
   const cellInset = unit * 0.1;
   const cellRadius = unit * 0.15;
 
-  const font = escapeXml(opts.fontFamily);
-  const weight = escapeXml(opts.fontWeight);
-  const fg = escapeXml(opts.fg);
-  const bg = escapeXml(opts.bg);
+  const draw = drawer ?? systemTextDrawer(opts.fontFamily);
+  const fgAttr = escapeXml(opts.fg);
 
   const body: string[] = [];
   body.push(
-    `<text x="${opts.width / 2}" y="${titleY}" fill="${fg}" font-family="${font}" font-size="${titleSize}" font-weight="500" text-anchor="middle" opacity="0.65">${escapeXml(titleText)}</text>`,
+    draw.draw(titleText, opts.width / 2, titleY, {
+      fill: opts.fg,
+      fontSize: titleSize,
+      fontWeight: "500",
+      opacity: 0.65,
+    }),
   );
 
   WEEKDAYS_JA.forEach((w, i) => {
     const cx = baseX + i * colW + colW / 2;
     const cy = gridTop + rowH / 2 + headerSize * 0.35;
     body.push(
-      `<text x="${cx}" y="${cy}" fill="${fg}" font-family="${font}" font-size="${headerSize}" font-weight="500" text-anchor="middle" opacity="0.55">${w}</text>`,
+      draw.draw(w, cx, cy, {
+        fill: opts.fg,
+        fontSize: headerSize,
+        fontWeight: "500",
+        opacity: 0.55,
+      }),
     );
   });
   cells.forEach((c, i) => {
@@ -336,23 +370,30 @@ export function renderMonthSvg(
 
     if (c.isToday) {
       body.push(
-        `<rect x="${cellX}" y="${cellY}" width="${cellW2}" height="${cellH2}" rx="${cellRadius}" ry="${cellRadius}" fill="${fg}"/>`,
+        `<rect x="${cellX}" y="${cellY}" width="${cellW2}" height="${cellH2}" rx="${cellRadius}" ry="${cellRadius}" fill="${fgAttr}"/>`,
       );
     }
-    const textColor = c.isToday ? bg : fg;
+    // 今日のセルは fg で塗り潰すので、文字は bg で抜く
+    const textColor = c.isToday ? opts.bg : opts.fg;
     const opacity = c.isToday ? 1 : c.scope === "cur" ? 1 : 0.3;
     body.push(
-      `<text x="${cx}" y="${cy}" fill="${textColor}" font-family="${font}" font-weight="${weight}" font-size="${dateSize}" text-anchor="middle" opacity="${opacity}">${c.day}</text>`,
+      draw.draw(String(c.day), cx, cy, {
+        fill: textColor,
+        fontSize: dateSize,
+        fontWeight: opts.fontWeight,
+        opacity,
+      }),
     );
   });
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle, extraDefs: draw.defs() });
 }
 
 export function renderYearSvg(
   now: Date,
   tz: string,
   opts: IconOptions,
+  drawer?: TextDrawer,
 ): string {
   const t = getTzDate(now, tz);
   const total = daysInYear(t.year);
@@ -382,12 +423,16 @@ export function renderYearSvg(
   const cellRadius = cellSize * 0.2;
   const fg = escapeXml(opts.fg);
   const bg = escapeXml(opts.bg);
-  const font = escapeXml(opts.fontFamily);
-  const weight = escapeXml(opts.fontWeight);
+  const draw = drawer ?? systemTextDrawer(opts.fontFamily);
 
   const body: string[] = [];
   body.push(
-    `<text x="${opts.width / 2}" y="${titleY}" fill="${fg}" font-family="${font}" font-size="${titleSize}" font-weight="${weight}" text-anchor="middle" opacity="0.85">${escapeXml(titleText)}</text>`,
+    draw.draw(titleText, opts.width / 2, titleY, {
+      fill: opts.fg,
+      fontSize: titleSize,
+      fontWeight: opts.fontWeight,
+      opacity: 0.85,
+    }),
   );
   for (let d = 1; d <= total; d++) {
     const slot = firstWd + d - 1;
@@ -409,7 +454,7 @@ export function renderYearSvg(
     }
   }
 
-  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle });
+  return wrapDynamicSvg(body.join("\n"), opts.width, opts.height, opts.bg, opts.radius, opts.rotate ?? 0, { gradTo: opts.gradTo, gradAngle: opts.gradAngle, extraDefs: draw.defs() });
 }
 
 export function renderDynamicSvg(
@@ -417,21 +462,22 @@ export function renderDynamicSvg(
   now: Date,
   tz: string,
   opts: IconOptions,
+  drawer?: TextDrawer,
 ): string {
   switch (keyword) {
     case "today":
     case "今日":
-      return renderTodaySvg(now, tz, opts);
+      return renderTodaySvg(now, tz, opts, drawer);
     case "week":
     case "今週":
-      return renderWeekSvg(now, tz, opts);
+      return renderWeekSvg(now, tz, opts, drawer);
     case "month":
     case "今月":
-      return renderMonthSvg(now, tz, opts);
+      return renderMonthSvg(now, tz, opts, drawer);
     case "year":
     case "今年":
-      return renderYearSvg(now, tz, opts);
+      return renderYearSvg(now, tz, opts, drawer);
     default:
-      return renderTodaySvg(now, tz, opts);
+      return renderTodaySvg(now, tz, opts, drawer);
   }
 }
