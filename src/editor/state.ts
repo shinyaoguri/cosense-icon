@@ -1,5 +1,5 @@
 import type { IconOpts } from "../pathrender";
-import { isDynamicKeyword } from "../dynamic";
+import { computeDayCount, DEFAULT_TZ, isDynamicKeyword } from "../dynamic";
 import { $input, $select, $textarea } from "./dom";
 
 export interface Defaults {
@@ -122,6 +122,25 @@ export function currentDynamicKeyword(): string | null {
  */
 export function isLiveContent(): boolean {
   return isCountMode() || currentDynamicKeyword() !== null;
+}
+
+/**
+ * プレビューに埋める日数。サーバと同じ computeDayCount を、ブラウザのタイムゾーンで呼ぶ。
+ * サーバはアクセス元 IP から TZ を推定するので、エディタを開いている本人にとっては
+ * ブラウザの TZ が同じ答えを返す。
+ */
+export function currentDayCount(): number {
+  const kind = $select("countMode").value === "countup" ? "up" : "down";
+  const date = $input("countDate").value || undefined;
+  return computeDayCount(kind, date, new Date(), browserTimezone());
+}
+
+function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TZ;
+  } catch {
+    return DEFAULT_TZ;
+  }
 }
 
 export function build(): string {
