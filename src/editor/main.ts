@@ -5,6 +5,7 @@ import { buildFontPicker, populateHiddenFontSelect } from "./fontPicker";
 import { applyPathname } from "./pathname";
 import {
   cancelScheduledPreview,
+  canRenderPreviewLocally,
   revokePreviewUrl,
   schedulePathifyPreview,
   setPreviewToUrl,
@@ -128,9 +129,9 @@ function update(): void {
   updateContrast();
   updateRegisterUI();
 
-  // Path 化プレビューは 1 URL 1 枚で登録するときだけ。グリフパック方式は日数や
-  // 日付をサーバが埋めるので、配信物そのものをプレビューに出す (= 見たままが届く)。
-  if (registrationKind() === "svg") {
+  // その場で組めるものはその場で組む (countdown は日数を埋めて実フォントで描く)。
+  // 動的キーワードだけは組み立てをサーバに任せているので、配信物をそのまま出す。
+  if (canRenderPreviewLocally()) {
     schedulePathifyPreview();
   } else {
     cancelScheduledPreview();

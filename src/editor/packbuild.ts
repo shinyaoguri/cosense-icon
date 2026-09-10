@@ -8,6 +8,7 @@ import {
   type PackGlyph,
 } from "../glyphpack";
 import type { OpenTypeFont, OpenTypeGlyph } from "../fonttypes";
+import { ensureFont } from "./pathify";
 
 /**
  * charset の各文字 (と、その並びに liga がかかる場合はそのクラスタ) を
@@ -89,4 +90,40 @@ export function buildPack(font: OpenTypeFont, charset: string): GlyphPack {
     ...(Object.keys(vert).length > 0 ? { vert } : {}),
     ...(Object.keys(kern).length > 0 ? { kern } : {}),
   };
+}
+
+// 同じ (family, weight, charset) のパックを組み直さないための小さなキャッシュ。
+// プレビューは入力のたびに走るうえ buildPack は文字集合の総当たりを含むので、ここが効く。
+// フォント本体の取得は ensureFont 側でキャッシュされている。
+const _packCache = new Map<string, GlyphPack>();
+const PACK_CACHE_MAX = 8;
+
+/**
+ * その文字集合ぶんのグリフパックを用意する。
+ *
+ * プレビューと R2 登録の両方がここを通るので、登録ボタンを押した時点では
+ * たいてい組み上がっており、残るのは Turnstile 認証と POST だけになる。
+ */
+export async function ensurePack(
+  family: string,
+  weight: string,
+  charset: string,
+): Promise<GlyphPack> {
+  const key = [family, weight, charset].join("|");
+  const hit = _packCache.get(key);
+  if (hit) {
+    _packCache.delete(key);
+    _packCache.set(key, hit);
+    return hit;
+  }
+  // charset を text として渡すことで、Google Fonts 側で必要な字だけに絞られる
+  const font = await ensureFont(family, weight, charset);
+  const pack = buildPack(font, charset);
+  _packCache.set(key, pack);
+  while (_packCache.size > PACK_CACHE_MAX) {
+    const oldest = _packCache.keys().next().value;
+    if (oldest === undefined) break;
+    _packCache.delete(oldest);
+  }
+  return pack;
 }

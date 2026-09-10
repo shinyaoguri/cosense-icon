@@ -1,11 +1,20 @@
+import { charsetForCount } from "../charset";
+import { createPackFont } from "../glyphpack";
+import { substituteCountToken } from "../parser";
 import { $, $textarea, $select, $input } from "./dom";
 import { isGoogleFont } from "./fonts";
+import { ensurePack } from "./packbuild";
 import { buildSvgFromFont, buildVerticalSvgFromFont, ensureFont } from "./pathify";
 import { buildSvgFromTex } from "./mathify";
 import {
   build,
   collectIconOpts,
+  currentDayCount,
+  currentDynamicKeyword,
   currentFontValue,
+  effectiveTextLines,
+  isCountMode,
+  isLiveContent,
   isMathMode,
   isVerticalMode,
   isWrapMode,
@@ -32,13 +41,27 @@ export function cancelScheduledPreview(): void {
   _previewReqId++;
 }
 
+/**
+ * サーバを介さず、その場でプレビューを組めるか。
+ *
+ * countdown / countup は日数をここで埋められるので、R2 に登録する前から実フォントで
+ * 見える。動的キーワード (today 等) はカレンダーの組み立てをサーバに任せているので、
+ * 配信物そのものをプレビューに出す。
+ */
+export function canRenderPreviewLocally(): boolean {
+  // 数式モード × 内容が毎回変わるパスは配信側でも非対応 (警告チップが出る)
+  if (isMathMode()) return !isLiveContent();
+  if (!isGoogleFont(currentFontValue())) return false;
+  return currentDynamicKeyword() === null;
+}
+
 export async function renderPathifyPreview(): Promise<void> {
   const family = currentFontValue();
   const mathOn = isMathMode();
   const verticalOn = isVerticalMode();
   // サーバ側で縦書きを描画できるので、システムフォント + 縦書きでも
   // ここでクライアント側プレビューに乗せる必要はない。Google Fonts のときだけ path 化が必要。
-  if (!mathOn && !isGoogleFont(family)) return;
+  if (!canRenderPreviewLocally()) return;
   const text = $textarea("text").value || "sample";
   const weight = $select("weight").value;
   const reqId = ++_previewReqId;
@@ -47,6 +70,17 @@ export async function renderPathifyPreview(): Promise<void> {
     let svg: string;
     if (mathOn) {
       svg = await buildSvgFromTex(text, collectIconOpts());
+    } else if (isCountMode()) {
+      // 日数を埋めてから、配信時とまったく同じ経路 (グリフパック) で組む。
+      // 登録はボタンを押したときだけで、プレビューは R2 を待たない。
+      const charset = charsetForCount(effectiveTextLines());
+      const pack = await ensurePack(family, weight, charset);
+      if (reqId !== _previewReqId) return;
+      const font = createPackFont(pack);
+      const lines = substituteCountToken(effectiveTextLines(), currentDayCount());
+      svg = verticalOn
+        ? buildVerticalSvgFromFont(font, lines, collectIconOpts(), isWrapMode())
+        : buildSvgFromFont(font, lines, collectIconOpts(), isWrapMode());
     } else {
       const font = await ensureFont(family, weight, text);
       if (reqId !== _previewReqId) return;

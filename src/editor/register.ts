@@ -1,7 +1,7 @@
 import { charsetForCount, DYNAMIC_CHARSET } from "../charset";
 import { $textarea, $select } from "./dom";
 import { isGoogleFont } from "./fonts";
-import { buildPack } from "./packbuild";
+import { ensurePack } from "./packbuild";
 import { buildSvgFromFont, buildVerticalSvgFromFont, ensureFont } from "./pathify";
 import { buildSvgFromTex } from "./mathify";
 import {
@@ -130,12 +130,9 @@ async function registerCurrentPack(onProgress?: ProgressCb): Promise<void> {
   const weight = $select("weight").value;
   const charset = currentCharset();
 
+  // プレビューが同じパックを組んでいれば、ここはキャッシュに当たって即返る
   onProgress?.("フォント取得中...");
-  // charset を text として渡すことで、Google Fonts 側で必要な字だけに絞られる
-  const font = await ensureFont(family, weight, charset);
-
-  onProgress?.("Path 化中...");
-  const pack = buildPack(font, charset);
+  const pack = await ensurePack(family, weight, charset);
 
   onProgress?.("認証中...");
   const token = await getTurnstileToken();
