@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # GitHub Actions のランタイム非推奨に取り残されないよう、action の更新は Dependabot に追随させる。
+  # npm はこのファイルの有無に関わらずセキュリティ更新が届くため、ここでは宣言しない。
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci
