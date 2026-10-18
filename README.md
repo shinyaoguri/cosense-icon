@@ -190,6 +190,7 @@ Google Fonts を選んだ場合、**プレビューはその場でブラウザ�
 - **トースト通知**: 画面上部中央。Google Fonts 登録の各段階 (フォント取得 → Path 化 → Turnstile → R2 登録) を逐次表示
 - **localStorage 保存**: 最後の編集状態と開閉ペイン状態を `cosense-icon:lastPath` / `cosense-icon:favorites` / `cosense-icon:favPaneOpen` に保持
 - **OGP メタ動的化**: アクセスされた URL に対応する SVG を `og:image` として埋め込む (Cosense / Discord 等の SNS 用)
+- **検索エンジン向け**: 索引するのはトップ (`/`) だけ。状態付きのエディタ URL には `X-Robots-Tag: noindex` を付け、`/robots.txt` で `/api/` のクロールを止める ([src/seo.ts](src/seo.ts))
 - **PWA**: `/manifest.webmanifest` + `/sw.js` を Worker が配信、ホーム画面追加とオフラインキャッシュに対応 (詳細は後述)
 
 エディタのテンプレートは [src/editor/editor.template.html](src/editor/editor.template.html)、ロジックは [src/editor/](src/editor/) 配下の TypeScript モジュール群。`scripts/build-editor.mjs` が `main.ts` を esbuild で IIFE バンドルし、`<!-- BUNDLE -->` プレースホルダに差し込んで `src/editor.html` を生成する。`src/editor.html` は Worker 起動時に文字列としてインポートされる。
@@ -291,6 +292,7 @@ src/
 ├─ svg.ts              IconOptions から SVG 文字列を生成 (回転 / 影 / 縁取り / グラデ)
 ├─ dynamic.ts          today / week / month / year のレンダラ
 ├─ random.ts           テキスト → ハッシュ → WCAG AA 配色
+├─ seo.ts              robots.txt / エディタ URL の X-Robots-Tag
 ├─ registry.ts         R2 キー / 警告マーカー / sanitize / Turnstile 検証
 ├─ editor.html         build スクリプトで生成される HTML (Git 管理対象)
 └─ editor/             エディタの TypeScript モジュール群
@@ -319,7 +321,7 @@ scripts/
                       (buildEditorHtml をエクスポートしテストと共有)
 
 test/
-├─ *.test.ts          parser / svg / dynamic / registry / random
+├─ *.test.ts          parser / svg / dynamic / registry / random / seo
 └─ editor-build.test.ts  dev/prod 両ビルドの inline 構文 + 埋め込み忠実性を検証
 ```
 
