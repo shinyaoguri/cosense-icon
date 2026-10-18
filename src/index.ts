@@ -37,6 +37,7 @@ import {
   withMarker,
   type RegistryEnv,
 } from "./registry";
+import { editorRobotsTag, ROBOTS_TXT } from "./seo";
 import { renderSvg, renderVerticalSvg } from "./svg";
 import { packTextDrawer } from "./textdraw";
 
@@ -134,6 +135,16 @@ function renderEditorHtml(url: URL): string {
   return editorHtml
     .replace(/__OG_IMAGE__/g, escapeHtml(ogImage))
     .replace(/__OG_URL__/g, escapeHtml(ogUrl));
+}
+
+function editorResponse(url: URL): Response {
+  const headers: Record<string, string> = {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "public, max-age=300",
+  };
+  const robots = editorRobotsTag(url.pathname);
+  if (robots) headers["x-robots-tag"] = robots;
+  return new Response(renderEditorHtml(url), { headers });
 }
 
 // favicon / OGP 用デフォルト画像 (cosense-icon ロゴ風)
@@ -640,10 +651,14 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/" || url.pathname === "") {
-      return new Response(renderEditorHtml(url), {
+      return editorResponse(url);
+    }
+
+    if (url.pathname === "/robots.txt") {
+      return new Response(ROBOTS_TXT, {
         headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=300",
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=86400",
         },
       });
     }
@@ -712,12 +727,7 @@ export default {
     // 拡張子 .svg が無い場合はエディタを返す (URL = ステート の対応関係)
     const isSvgRequest = url.pathname.toLowerCase().endsWith(".svg");
     if (!isSvgRequest) {
-      return new Response(renderEditorHtml(url), {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "public, max-age=300",
-        },
-      });
+      return editorResponse(url);
     }
 
     return handleIcon(url, parsed, env, request, ctx);
